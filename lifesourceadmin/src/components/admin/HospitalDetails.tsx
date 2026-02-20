@@ -1,4 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -66,7 +68,42 @@ const hospitalData = {
 };
 
 export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
-  const hospital = hospitalData;
+  const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
+  const token = localStorage.getItem("adminToken");
+
+  const getHospitalById = async () => {
+    const res = await axios.get(
+      `${apiURL}/admin/hospitals/${hospitalId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log(res.data.data)
+    return res.data.data;
+  };
+
+  const {
+    data: hospital,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["hospital", hospitalId],
+    queryFn: getHospitalById,
+    enabled: !!hospitalId,
+  });
+
+  if (isLoading) {
+    return <div className="p-6">Loading hospital details...</div>;
+  }
+
+  if (isError || !hospital) {
+    return <div className="p-6">Unable to load hospital.</div>;
+  }
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -75,7 +112,6 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
       case "Fulfilled":
         return "bg-success text-success-foreground";
       case "Pending":
-      case "In Progress":
         return "bg-warning text-warning-foreground";
       case "Rejected":
       case "Suspended":
@@ -95,7 +131,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{hospital.name}</h1>
+              <h1 className="text-3xl font-bold">{hospital.institutionName}</h1>
               <Badge className={getStatusColor(hospital.status)}>
                 {hospital.status}
               </Badge>
@@ -127,15 +163,15 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold">{hospital.stats.totalDonors.toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Total Donors</p>
+              <p className="text-2xl font-bold">{hospital?.totalDonationsProcessed}</p>
+              <p className="text-sm text-muted-foreground">Total Donations</p>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold">{hospital.stats.totalRequests.toLocaleString()}</p>
+              <p className="text-2xl font-bold">{hospital?.totalRequestsFulfilled}</p>
               <p className="text-sm text-muted-foreground">Total Requests</p>
             </div>
           </CardContent>
@@ -143,7 +179,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-success">{hospital.stats.fulfilledRequests.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-success">{hospital?.totalRequestsFulfilled}</p>
               <p className="text-sm text-muted-foreground">Fulfilled</p>
             </div>
           </CardContent>
@@ -151,7 +187,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold text-warning">{hospital.stats.pendingRequests.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-warning">0</p>
               <p className="text-sm text-muted-foreground">Pending</p>
             </div>
           </CardContent>
@@ -159,7 +195,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold">{hospital.stats.bloodUnitsStored.toLocaleString()}</p>
+              <p className="text-2xl font-bold">2</p>
               <p className="text-sm text-muted-foreground">Blood Units</p>
             </div>
           </CardContent>
@@ -188,30 +224,30 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Institution ID</p>
-                    <p className="font-medium">{hospital.id}</p>
+                    <p className="font-medium">{hospital._id}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Type</p>
-                    <p className="font-medium capitalize">{hospital.type}</p>
+                    <p className="font-medium capitalize">{hospital?.institutionType}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">License Number</p>
-                    <p className="font-medium">{hospital.licenseNumber}</p>
+                    <p className="font-medium">{hospital?.licenseRegNo}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Capacity</p>
-                    <p className="font-medium">{hospital.capacity} beds</p>
+                    <p className="font-medium">{hospital?.capacity} beds</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Registered Date</p>
-                    <p className="font-medium">{hospital.registeredAt}</p>
+                    <p className="font-medium">{hospital?.createdAt}</p>
                   </div>
-                  <div>
+                  {/* <div>
                     <p className="text-sm text-muted-foreground">Document Status</p>
                     <Badge className={getStatusColor(hospital.documentsStatus)}>
                       {hospital.documentsStatus}
                     </Badge>
-                  </div>
+                  </div> */}
                 </div>
               </CardContent>
             </Card>
@@ -226,26 +262,26 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{hospital.contactPerson.name}</p>
+                  <p className="font-medium">{hospital?.contactFullName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Role</p>
-                  <p className="font-medium">{hospital.contactPerson.role}</p>
+                  <p className="font-medium">Manager</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-muted-foreground" />
-                  <p className="font-medium">{hospital.contactPerson.email}</p>
+                  <p className="font-medium">{hospital?.contactEmail}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-muted-foreground" />
-                  <p className="font-medium">{hospital.contactPerson.phone}</p>
+                  <p className="font-medium">{hospital?.contactPhone}</p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="requests" className="mt-4">
+        {/* <TabsContent value="requests" className="mt-4">
           <Card className="shadow-soft">
             <CardHeader>
               <CardTitle>Recent Requests</CardTitle>
@@ -270,9 +306,9 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
-        <TabsContent value="documents" className="mt-4">
+        {/* <TabsContent value="documents" className="mt-4">
           <Card className="shadow-soft">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -304,7 +340,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="contact" className="mt-4">
           <Card className="shadow-soft">
@@ -318,28 +354,28 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
                   <h3 className="font-semibold">Institution Contact</h3>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground" />
-                    <p>{hospital.email}</p>
+                    <p>{hospital?.officialEmail}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                    <p>{hospital.phone}</p>
+                    <p>{hospital?.phoneNumber}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <p>{hospital.address}</p>
+                    <p>{hospital?.address}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <h3 className="font-semibold">Primary Contact Person</h3>
-                  <p className="font-medium">{hospital.contactPerson.name}</p>
-                  <p className="text-sm text-muted-foreground">{hospital.contactPerson.role}</p>
+                  <p className="font-medium">{hospital?.contactFullName}</p>
+                  {/* <p className="text-sm text-muted-foreground">Nurse</p> */}
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground" />
-                    <p>{hospital.contactPerson.email}</p>
+                    <p>{hospital?.contactEmail}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                    <p>{hospital.contactPerson.phone}</p>
+                    <p>{hospital?.contactPhone}</p>
                   </div>
                 </div>
               </div>

@@ -6,9 +6,97 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
+  IsNotEmpty,
+  IsEmail,
+  Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BroadcastTarget } from '../../common/enums';
+import { InstitutionType } from '../schemas';
+
+// ─── Hospital Management ───────────────────────────────────────────────────────
+
+export class CreateHospitalDto {
+  @ApiProperty({ enum: InstitutionType, example: InstitutionType.HOSPITAL })
+  @IsEnum(InstitutionType)
+  institutionType: InstitutionType;
+
+  @ApiProperty({ example: 'Lagos General Hospital' })
+  @IsString()
+  @IsNotEmpty()
+  institutionName: string;
+
+  @ApiProperty({ example: 'info@lagosgeneral.org' })
+  @IsEmail()
+  officialEmail: string;
+
+  @ApiProperty({ example: '+2348012345678' })
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
+
+  @ApiProperty({ example: 'LIC/MED/2020/0042' })
+  @IsString()
+  @IsNotEmpty()
+  licenseRegNo: string;
+
+  @ApiProperty({ example: 200, description: 'Max blood unit capacity' })
+  @IsNumber()
+  @Min(1)
+  capacity: number;
+
+  @ApiProperty({ example: '12 Hospital Road, Victoria Island' })
+  @IsString()
+  @IsNotEmpty()
+  address: string;
+
+  @ApiProperty({ example: 'Lagos' })
+  @IsString()
+  @IsNotEmpty()
+  city: string;
+
+  @ApiProperty({ example: 'Lagos State' })
+  @IsString()
+  @IsNotEmpty()
+  state: string;
+
+  @ApiPropertyOptional({ example: '101001' })
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+
+  @ApiProperty({ example: 'Nigeria' })
+  @IsString()
+  @IsNotEmpty()
+  country: string;
+
+  @ApiProperty({
+    example: 'Dr. Amina Bello',
+    description: 'Full name of the contact person',
+  })
+  @IsString()
+  @IsNotEmpty()
+  contactFullName: string;
+
+  @ApiProperty({
+    example: 'amina.bello@lagosgeneral.org',
+    description: 'Login email for the hospital admin user account',
+  })
+  @IsEmail()
+  contactEmail: string;
+
+  @ApiProperty({ example: '+2348098765432' })
+  @IsString()
+  @IsNotEmpty()
+  contactPhone: string;
+
+  @ApiPropertyOptional({
+    example: 'Primary trauma center with 24/7 blood bank.',
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
 
 export class ApproveHospitalDto {
   @ApiPropertyOptional({
@@ -19,11 +107,92 @@ export class ApproveHospitalDto {
   reason?: string;
 }
 
-export class AssignCredentialsDto {
-  @ApiProperty({ description: 'User ID to assign as hospital admin' })
-  @IsMongoId()
-  userId: string;
+export class RejectHospitalDto {
+  @ApiProperty({ description: 'Reason for rejection' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }
+
+export class UpdateHospitalDto {
+  @ApiPropertyOptional({ enum: InstitutionType })
+  @IsOptional()
+  @IsEnum(InstitutionType)
+  institutionType?: InstitutionType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  institutionName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEmail()
+  officialEmail?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  licenseRegNo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  capacity?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contactFullName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+// ─── Request Management ────────────────────────────────────────────────────────
 
 export class RedirectRequestDto {
   @ApiProperty({ description: 'Hospital ID to redirect the request to' })
@@ -36,6 +205,7 @@ export class RedirectRequestDto {
   reason?: string;
 }
 
+// ─── Broadcast DTOs ───────────────────────────────────────────────────────────────
 export class CreateBroadcastDto {
   @ApiProperty({ example: 'Urgent Blood Shortage Alert' })
   @IsString()
@@ -72,6 +242,41 @@ export class CreateBroadcastDto {
   @IsOptional()
   @IsBoolean()
   isEmailEnabled?: boolean;
+}
+
+// ─── Query DTOs ───────────────────────────────────────────────────────────────
+export class UserManagementQueryDto {
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 20 })
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Search by name or email' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by blood type e.g. O+' })
+  @IsOptional()
+  @IsString()
+  bloodType?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by city' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({
+    description: 'true = active only, false = inactive only',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class AdminQueryDto {
@@ -119,4 +324,11 @@ export class ReportQueryDto {
   @IsOptional()
   @IsString()
   groupBy?: string;
+}
+
+export class SuspendUserDto {
+  @ApiProperty({ description: 'Reason for suspension/deactivation' })
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
 }

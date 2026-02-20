@@ -1,4 +1,6 @@
 import { useState } from "react";
+import axios from "axios";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,14 +19,43 @@ const hospitals = [
 type ViewMode = "list" | "add" | "details";
 
 export function HospitalManagement() {
+  const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
+  const token = localStorage.getItem("adminToken");
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null);
 
+  const getHospitals = async () => {
+    try {
+      const res = await axios.get(`${apiURL}/admin/hospitals`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.data.data.hospitals
+      console.log(res.data.data.hospitals);
+      return data;
+    } catch (error) {
+      console.error("Error fetching hospitals:", error);
+      throw error;
+    }
+  };
+
+  const {
+    data: hospitals = [],
+    isLoading: hospitalsLoading,
+  } = useQuery({
+    queryKey: ["Hospitals"],
+    queryFn: getHospitals,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const filteredHospitals = hospitals.filter(hospital => {
-    const matchesSearch = hospital.name.toLowerCase().includes(searchQuery.toLowerCase()) || hospital.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "All" || hospital.status === statusFilter;
+    const matchesSearch = hospital?.institutionName.toLowerCase().includes(searchQuery.toLowerCase()) || hospital?.city.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "All" || hospital?.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -71,23 +102,30 @@ export function HospitalManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredHospitals.map((hospital) => (
-          <Card key={hospital.id} className="shadow-soft hover:shadow-medium transition-smooth">
+          <Card key={hospital._id} className="shadow-soft hover:shadow-medium transition-smooth">
             <CardHeader>
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2">{hospital.name}<Badge variant="outline" className="capitalize">{hospital.type}</Badge></CardTitle>
-                  <CardDescription className="flex items-center mt-1"><MapPin className="w-4 h-4 mr-1" />{hospital.location}</CardDescription>
+                  <CardTitle className="flex items-center gap-2">{hospital?.institutionName}<Badge variant="outline" className="capitalize">{hospital.institutionType}</Badge></CardTitle>
+                  <CardDescription className="flex items-center mt-1"><MapPin className="w-4 h-4 mr-1" />{hospital?.city + ", " + hospital?.country}</CardDescription>
                 </div>
                 <Badge className={getStatusColor(hospital.status)}>{hospital.status}</Badge>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-4 h-4" />{hospital.email}</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-4 h-4" />{hospital.phone}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Mail className="w-4 h-4" />{hospital?.officialEmail}</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-4 h-4" />{hospital?.phoneNumber}</div>
               </div>
               <div className="flex justify-end mt-4">
-                <Button size="sm" variant="outline" onClick={() => { setSelectedHospitalId(hospital.id); setViewMode("details"); }}><Eye className="w-4 h-4 mr-1" />View Details</Button>
+                <Button size="sm" variant="outline"
+                  onClick={() => {
+                    setSelectedHospitalId(hospital._id);
+                    setViewMode("details");
+                  }}>
+                  <Eye className="w-4 h-4 mr-1" />
+                  View Details
+                </Button>
               </div>
             </CardContent>
           </Card>

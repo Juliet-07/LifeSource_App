@@ -7,40 +7,191 @@ export class EmailService {
 
   constructor(private readonly mailerService: MailerService) {}
 
-  async sendManagerApprovalEmail(
+  async sendHospitalApprovalEmail(
     to: string,
     firstName: string,
     temporaryPassword: string,
   ): Promise<void> {
     await this.sendMail({
       to,
-      subject: 'Your Pharmacy Manager Account Has Been Approved',
+      subject: 'Your Hospital Has Been Approved — LifeSource',
       html: `
-        <h2>Welcome, ${firstName}!</h2>
-        <p>Your pharmacy manager account has been approved. You can now log in using the credentials below.</p>
-        <p><strong>Email:</strong> ${to}</p>
-        <p><strong>Temporary Password:</strong> <code style="background:#f4f4f4;padding:4px 8px;border-radius:4px;">${temporaryPassword}</code></p>
-        <p style="color:#e53e3e;"><strong>Important:</strong> Please change your password immediately after your first login.</p>
-        <br/>
-        <p>If you have any questions, please contact support.</p>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Hospital Approved</title>
+        </head>
+        <body style="margin:0;padding:0;background-color:#f9fafb;font-family:'Segoe UI',Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color:#c53030;padding:32px 40px;text-align:center;">
+                      <h1 style="margin:0;color:#ffffff;font-size:24px;letter-spacing:0.5px;">LifeSource</h1>
+                      <p style="margin:6px 0 0;color:#feb2b2;font-size:13px;">Hospital Network Administration</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding:40px;">
+
+                      <h2 style="margin:0 0 12px;color:#1a202c;font-size:20px;">Congratulations, ${firstName}!</h2>
+                      <p style="margin:0 0 20px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        Your hospital's registration on the <strong>LifeSource</strong> platform has been reviewed and <strong style="color:#2f855a;">approved</strong>.
+                        Your administrator account is now active and ready to use.
+                      </p>
+
+                      <p style="margin:0 0 8px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        You can now log in to manage your hospital's blood inventory, respond to blood requests, record donations, and coordinate with the LifeSource network.
+                      </p>
+
+                      <!-- Credentials box -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;">
+                        <tr>
+                          <td style="padding:24px;">
+                            <p style="margin:0 0 14px;color:#742a2a;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">Your Login Credentials</p>
+                            <table cellpadding="0" cellspacing="0">
+                              <tr>
+                                <td style="padding:4px 0;color:#718096;font-size:14px;width:80px;">Email</td>
+                                <td style="padding:4px 0;color:#1a202c;font-size:14px;font-weight:600;">${to}</td>
+                              </tr>
+                              <tr>
+                                <td style="padding:4px 0;color:#718096;font-size:14px;">Password</td>
+                                <td style="padding:4px 0;">
+                                  <code style="background:#fff;border:1px solid #fed7d7;color:#c53030;padding:3px 10px;border-radius:4px;font-size:14px;font-weight:700;letter-spacing:1px;">${temporaryPassword}</code>
+                                </td>
+                              </tr>
+                            </table>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <!-- Warning -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;background:#fffbeb;border-left:4px solid #d69e2e;border-radius:4px;">
+                        <tr>
+                          <td style="padding:14px 16px;color:#744210;font-size:14px;line-height:1.5;">
+                            <strong>⚠ Important:</strong> This is a temporary password. You will be required to change it on your first login. Please keep your credentials confidential.
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="margin:0 0 28px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        If you encounter any issues accessing your account or have questions about managing your hospital on LifeSource, please reach out to our support team.
+                      </p>
+
+                      <p style="margin:0;color:#4a5568;font-size:15px;">
+                        Thank you for joining the LifeSource network. Together, we save lives.
+                      </p>
+
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background:#f7fafc;padding:24px 40px;border-top:1px solid #e2e8f0;text-align:center;">
+                      <p style="margin:0;color:#a0aec0;font-size:12px;">
+                        © ${new Date().getFullYear()} LifeSource · This is an automated message, please do not reply directly to this email.
+                      </p>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `,
     });
   }
 
-  async sendManagerRejectionEmail(
+  async sendHospitalRejectionEmail(
     to: string,
     firstName: string,
     reason: string,
   ): Promise<void> {
     await this.sendMail({
       to,
-      subject: 'Your Pharmacy Manager Request Has Been Reviewed',
+      subject: 'Update on Your Hospital Registration — LifeSource',
       html: `
-        <h2>Hello, ${firstName}</h2>
-        <p>We have reviewed your pharmacy manager registration request and unfortunately it has not been approved at this time.</p>
-        <p><strong>Reason:</strong> ${reason}</p>
-        <br/>
-        <p>If you believe this is a mistake or would like to reapply, please contact our support team.</p>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>Hospital Registration Update</title>
+        </head>
+        <body style="margin:0;padding:0;background-color:#f9fafb;font-family:'Segoe UI',Arial,sans-serif;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+            <tr>
+              <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                  <!-- Header -->
+                  <tr>
+                    <td style="background-color:#c53030;padding:32px 40px;text-align:center;">
+                      <h1 style="margin:0;color:#ffffff;font-size:24px;letter-spacing:0.5px;">LifeSource</h1>
+                      <p style="margin:6px 0 0;color:#feb2b2;font-size:13px;">Hospital Network Administration</p>
+                    </td>
+                  </tr>
+
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding:40px;">
+
+                      <h2 style="margin:0 0 12px;color:#1a202c;font-size:20px;">Hello, ${firstName}</h2>
+                      <p style="margin:0 0 20px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        Thank you for submitting your hospital's registration request to join the <strong>LifeSource</strong> network.
+                        After careful review, we are unable to approve your registration at this time.
+                      </p>
+
+                      <!-- Reason box -->
+                      <table width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;background:#fff5f5;border:1px solid #fed7d7;border-radius:8px;">
+                        <tr>
+                          <td style="padding:24px;">
+                            <p style="margin:0 0 10px;color:#742a2a;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;">Reason for Rejection</p>
+                            <p style="margin:0;color:#1a202c;font-size:15px;line-height:1.6;">${reason}</p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="margin:0 0 16px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        If you believe this decision was made in error, or if you have addressed the issue above and would like to reapply, please contact our support team with the relevant documentation and we will be happy to assist you.
+                      </p>
+
+                      <p style="margin:0 0 28px;color:#4a5568;font-size:15px;line-height:1.6;">
+                        We appreciate your interest in partnering with LifeSource and hope to work with your institution in the future.
+                      </p>
+
+                      <p style="margin:0;color:#4a5568;font-size:15px;">
+                        Warm regards,<br/>
+                        <strong>The LifeSource Team</strong>
+                      </p>
+
+                    </td>
+                  </tr>
+
+                  <!-- Footer -->
+                  <tr>
+                    <td style="background:#f7fafc;padding:24px 40px;border-top:1px solid #e2e8f0;text-align:center;">
+                      <p style="margin:0;color:#a0aec0;font-size:12px;">
+                        © ${new Date().getFullYear()} LifeSource · This is an automated message, please do not reply directly to this email.
+                      </p>
+                    </td>
+                  </tr>
+
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
       `,
     });
   }

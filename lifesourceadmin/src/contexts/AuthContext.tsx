@@ -1,59 +1,115 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import axios, { AxiosError } from "axios";
 
 interface AuthContextType {
-  user: User | null;
   isAuthenticated: boolean;
+  loading: boolean;
+  errorMessage: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem("lifesource_user");
-    return saved ? JSON.parse(saved) : null;
-  });
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulated authentication - in production, this would call an API
-    if (email && password.length >= 6) {
-      const newUser = {
-        id: "1",
-        email,
-        name: email.split("@")[0],
-        role: "Super Admin",
-      };
-      setUser(newUser);
-      localStorage.setItem("lifesource_user", JSON.stringify(newUser));
-      return true;
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL as string;
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("adminToken");
+
+    if (token) {
+      setIsAuthenticated(true);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     }
-    return false;
+
+    setLoading(false);
+  }, []);
+
+  const login = async (
+    email: string,
+    password: string
+  ): Promise<boolean> => {
+    setErrorMessage(null);
+
+    const url = `${apiURL}/auth/login`;
+
+    try {
+      const res = await axios.post<{
+        message: string; data: {
+          accessToken: string;
+          user: {
+            firstName: string;
+            lastName: string;
+            email: string
+          }
+        }
+      }>(url, {
+        email,
+        password,
+      });
+
+      const { accessToken, user } = res.data.data;
+
+      localStorage.setItem("adminToken", accessToken);
+
+      localStorage.setItem("adminUser", JSON.stringify(user))
+
+      axios.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+
+      setIsAuthenticated(true);
+      return true;
+    } catch (error) {
+      const err = error as AxiosError<{ message?: string }>;
+
+      const message =
+        err.response?.data?.message || "Login failed";
+
+      setErrorMessage(message);
+      return false;
+    }
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("lifesource_user");
+    localStorage.removeItem("adminToken");
+    delete axios.defaults.headers.common["Authorization"];
+    setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        isAuthenticated,
+        login,
+        logout,
+        loading,
+        errorMessage,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
+
   return context;
-}
+};

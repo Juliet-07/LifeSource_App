@@ -14,7 +14,7 @@ const SignIn = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, errorMessage } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,20 +35,20 @@ const SignIn = () => {
     }
 
     const success = await login(email, password);
-    
+
     if (success) {
       navigate("/admin");
     } else {
       setError("Invalid credentials. Please try again.");
     }
-    
+
     setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-      
+
       <Card className="w-full max-w-md shadow-strong relative z-10">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center items-center gap-3">
@@ -62,7 +62,7 @@ const SignIn = () => {
             </CardDescription>
           </div>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -71,7 +71,7 @@ const SignIn = () => {
                 <span>{error}</span>
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
@@ -86,7 +86,7 @@ const SignIn = () => {
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
@@ -101,7 +101,7 @@ const SignIn = () => {
                 />
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" className="rounded border-border" />
@@ -111,9 +111,9 @@ const SignIn = () => {
                 Forgot password?
               </a>
             </div>
-            
-            <Button 
-              type="submit" 
+
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90"
               disabled={isLoading}
             >
@@ -127,7 +127,7 @@ const SignIn = () => {
               )}
             </Button>
           </form>
-          
+
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Super Admin access only</p>
           </div>
