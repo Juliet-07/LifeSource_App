@@ -57,9 +57,10 @@ export default function Overview() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
+      <div className="">
         {/* Blood Inventory by Type */}
-        <Card className="border-border">
+        {/* <Card className="border-border">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Droplets className="w-5 h-5 text-primary" />
@@ -80,7 +81,7 @@ export default function Overview() {
               ))}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Recent Appointments */}
         <Card className="border-border">

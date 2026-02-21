@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Droplets, 
-  Users, 
-  FileText, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Calendar,
+  Droplets,
+  Users,
+  FileText,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -27,12 +27,12 @@ import HospitalSettings from './HospitalSettings';
 
 const navItems = [
   { path: '/dashboard', label: 'Overview', icon: LayoutDashboard, end: true },
+  { path: '/dashboard/requests', label: 'Requests', icon: Heart },
   { path: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
   { path: '/dashboard/inventory', label: 'Inventory', icon: Droplets },
-  { path: '/dashboard/requests', label: 'Requests', icon: Heart },
   { path: '/dashboard/people', label: 'Donors & Recipients', icon: Users },
   { path: '/dashboard/reports', label: 'Reports', icon: FileText },
-  { path: '/dashboard/settings', label: 'Hospital Settings', icon: Settings },
+  // { path: '/dashboard/settings', label: 'Hospital Settings', icon: Settings },
 ];
 
 export default function Dashboard() {
@@ -48,7 +48,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background flex">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-foreground/50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -81,8 +81,8 @@ export default function Dashboard() {
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) => cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive 
-                    ? "bg-secondary text-secondary-foreground" 
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
@@ -94,8 +94,8 @@ export default function Dashboard() {
 
           {/* Logout */}
           <div className="p-4 border-t border-border">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >
@@ -111,8 +111,8 @@ export default function Dashboard() {
         {/* Mobile header */}
         <header className="lg:hidden sticky top-0 z-30 bg-card border-b border-border p-4">
           <div className="flex items-center justify-between">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
             >

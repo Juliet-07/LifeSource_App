@@ -103,7 +103,7 @@ export const mockHospitalInfo: HospitalInfo = {
 export const mockAppointments: DonationAppointment[] = [
   { id: '1', donorName: 'John Doe', donorPhone: '+234 802 111 2222', donorEmail: 'john@email.com', bloodType: 'O+', appointmentDate: '2024-01-20', appointmentTime: '09:00', status: 'pending' },
   { id: '2', donorName: 'Jane Smith', donorPhone: '+234 803 333 4444', donorEmail: 'jane@email.com', bloodType: 'A-', appointmentDate: '2024-01-20', appointmentTime: '10:30', status: 'confirmed' },
-  { id: '3', donorName: 'Michael Johnson', donorPhone: '+234 804 555 6666', donorEmail: 'michael@email.com', bloodType: 'B+', appointmentDate: '2024-01-21', appointmentTime: '11:00', status: 'pending' },
+  // { id: '3', donorName: 'Michael Johnson', donorPhone: '+234 804 555 6666', donorEmail: 'michael@email.com', bloodType: 'B+', appointmentDate: '2024-01-21', appointmentTime: '11:00', status: 'pending' },
   { id: '4', donorName: 'Sarah Williams', donorPhone: '+234 805 777 8888', donorEmail: 'sarah@email.com', bloodType: 'AB+', appointmentDate: '2024-01-22', appointmentTime: '14:00', status: 'completed' },
   { id: '5', donorName: 'David Brown', donorPhone: '+234 806 999 0000', donorEmail: 'david@email.com', bloodType: 'O-', appointmentDate: '2024-01-23', appointmentTime: '09:30', status: 'rejected', notes: 'Recent illness' },
 ];

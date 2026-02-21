@@ -7,10 +7,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './modules/auth/auth.module';
 import { AdminModule } from './modules/dashboard/admin/admin.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { HospitalModule } from './modules/dashboard/hospital/hospital.module';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -32,6 +35,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     LoggerModule,
     AuthModule,
     AdminModule,
+    HospitalModule
   ],
   controllers: [AppController],
   providers: [AppService],
