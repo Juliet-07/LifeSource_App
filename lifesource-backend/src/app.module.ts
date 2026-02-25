@@ -9,6 +9,8 @@ import { AdminModule } from './modules/dashboard/admin/admin.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HospitalModule } from './modules/dashboard/hospital/hospital.module';
+import { RecipientModule } from './modules/dashboard/recipient/recipient.module';
+import { DonorModule } from './modules/dashboard/donor/donor.module';
 
 @Module({
   imports: [
@@ -35,7 +37,9 @@ import { HospitalModule } from './modules/dashboard/hospital/hospital.module';
     LoggerModule,
     AuthModule,
     AdminModule,
-    HospitalModule
+    DonorModule,
+    HospitalModule,
+    RecipientModule,
   ],
   controllers: [AppController],
   providers: [AppService],
