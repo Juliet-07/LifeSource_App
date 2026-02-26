@@ -7,9 +7,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from '../auth/jwt.strategy';
 import { User, UserSchema, Donor, DonorSchema } from '../schemas';
+import { MailModule } from 'src/common/utils/email.module';
 
 @Module({
   imports: [
+    MailModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Donor.name, schema: DonorSchema },

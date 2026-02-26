@@ -38,6 +38,20 @@ import { UserRole } from '../../../common/enums';
 export class HospitalController {
   constructor(private readonly hospitalService: HospitalService) {}
 
+  // ─── Dashboard ────────────────────────────────────────────────────────────────
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Hospital dashboard',
+    description:
+      'Aggregated stats for this hospital: available inventory by blood type, ' +
+      'expiring units alert, open/fulfilled request counts, fulfillment rate, ' +
+      "today's appointments, upcoming this week, and monthly donation activity.",
+  })
+  getDashboard(@CurrentUser('_id') userId: string) {
+    return this.hospitalService.getDashboard(userId);
+  }
+
   // ─── Profile ──────────────────────────────────────────────────────────────────
 
   @Post('profile')

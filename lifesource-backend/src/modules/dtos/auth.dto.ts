@@ -4,56 +4,53 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  MinLength,
-  IsBoolean,
   IsNumber,
-  IsArray,
-  IsLatitude,
-  IsLongitude,
   ValidateIf,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BloodType, UserRole, DonationType } from '../../common/enums';
+import { BloodType, DonationType, ActiveRole } from '../../common/enums';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'John' })
+  @ApiProperty({ example: 'Jane' })
+  @IsNotEmpty()
   @IsString()
   firstName: string;
 
-  @ApiProperty({ example: 'Doe' })
+  @ApiProperty({ example: 'Okafor' })
+  @IsNotEmpty()
   @IsString()
   lastName: string;
 
-  @ApiProperty({ example: 'john.doe@example.com' })
+  @ApiProperty({ example: 'jane@example.com' })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'StrongPass123!' })
+  @ApiProperty({ example: 'mypassword' })
   @IsString()
-  @MinLength(8)
+  @IsNotEmpty()
   password: string;
 
-  @ApiProperty({ enum: UserRole, example: UserRole.DONOR })
-  @IsEnum(UserRole)
-  role: UserRole;
-
-  // Only required when role is DONOR
-  @ApiProperty({ enum: BloodType, example: BloodType.O_POSITIVE })
-  @ValidateIf((o) => o.role === UserRole.DONOR)
+  @ApiProperty({
+    enum: BloodType,
+    example: BloodType.O_POSITIVE,
+    description:
+      'Blood type is required at registration and applies to both donor and recipient contexts',
+  })
   @IsEnum(BloodType)
-  bloodType?: string;
+  bloodType: BloodType;
 
-  @ApiPropertyOptional({ example: '+1234567890' })
+  @ApiPropertyOptional({ example: '+2348012345678' })
   @IsOptional()
   @IsString()
   phone?: string;
 
-  @ApiPropertyOptional({ example: 'Ikeja' })
+  @ApiPropertyOptional({ example: 'Lagos' })
   @IsOptional()
   @IsString()
   city?: string;
 
-  @ApiPropertyOptional({ example: 'Lagos' })
+  @ApiPropertyOptional({ example: 'Lagos State' })
   @IsOptional()
   @IsString()
   state?: string;
@@ -63,48 +60,47 @@ export class RegisterDto {
   @IsString()
   country?: string;
 
-  @ApiPropertyOptional({ example: 3.3792 })
-  @IsOptional()
-  latitude?: number;
-
-  @ApiPropertyOptional({ example: 6.5244 })
-  @IsOptional()
-  longitude?: number;
-
-  // Donor-specific fields
-  @ApiPropertyOptional({ example: true })
-  @ValidateIf((o) => o.role === UserRole.DONOR)
-  @IsOptional()
-  consentGiven?: boolean;
-
-  @ApiPropertyOptional({ enum: DonationType })
-  @ValidateIf((o) => o.role === UserRole.DONOR)
-  @IsOptional()
-  @IsEnum(DonationType)
-  preferredDonationType?: string;
-
-  @ApiPropertyOptional({ example: 70 })
-  @ValidateIf((o) => o.role === UserRole.DONOR)
+  // Donor profile fields (optional at signup, can be updated later)
+  @ApiPropertyOptional({ example: 70, description: 'Weight in kg' })
   @IsOptional()
   @IsNumber()
   weight?: number;
 
   @ApiPropertyOptional({ example: 28 })
-  @ValidateIf((o) => o.role === UserRole.DONOR)
   @IsOptional()
   @IsNumber()
   age?: number;
+
+  @ApiPropertyOptional({ enum: DonationType })
+  @IsOptional()
+  @IsEnum(DonationType)
+  preferredDonationType?: DonationType;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  consentGiven?: boolean;
 }
 
 export class LoginDto {
-  @ApiProperty({ example: 'john.doe@example.com' })
+  @ApiProperty({ example: 'jane@example.com' })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'StrongPass123!' })
+  @ApiProperty({ example: 'mypassword' })
   @IsString()
   @IsNotEmpty()
   password: string;
+}
+
+export class SwitchRoleDto {
+  @ApiProperty({
+    enum: ActiveRole,
+    example: ActiveRole.DONOR,
+    description: 'Switch between donor and recipient context',
+  })
+  @IsEnum(ActiveRole)
+  activeRole: ActiveRole;
 }
 
 export class RefreshTokenDto {
@@ -122,25 +118,7 @@ export class ChangePasswordDto {
 
   @ApiProperty()
   @IsString()
-  @MinLength(8)
-  newPassword: string;
-}
-
-export class ForgotPasswordDto {
-  @ApiProperty({ example: 'john.doe@example.com' })
-  @IsEmail()
-  email: string;
-}
-
-export class ResetPasswordDto {
-  @ApiProperty()
-  @IsString()
   @IsNotEmpty()
-  token: string;
-
-  @ApiProperty()
-  @IsString()
-  @MinLength(8)
   newPassword: string;
 }
 

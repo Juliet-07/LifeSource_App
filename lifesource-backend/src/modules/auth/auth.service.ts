@@ -17,8 +17,10 @@ import {
   RefreshTokenDto,
   ChangePasswordDto,
   UpdateFcmTokenDto,
+  SwitchRoleDto,
 } from '../dtos';
-import { UserRole } from '../../common/enums';
+import { ActiveRole, UserRole } from '../../common/enums';
+import { EmailService } from 'src/common/utils/email.service';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +29,7 @@ export class AuthService {
     @InjectModel(Donor.name) private donorModel: Model<DonorDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -39,44 +42,43 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(dto.password, 12);
 
-    // Build location if coordinates provided
-    const location =
-      dto.longitude && dto.latitude
-        ? { type: 'Point', coordinates: [dto.longitude, dto.latitude] }
-        : undefined;
-
     const user = await this.userModel.create({
       firstName: dto.firstName,
       lastName: dto.lastName,
       email: dto.email,
       password: hashedPassword,
-      role: dto.role,
+      role: UserRole.USER,
+      activeRole: ActiveRole.DONOR,
+      usedRoles: [],
       bloodType: dto.bloodType,
       phone: dto.phone,
       city: dto.city,
       state: dto.state,
       country: dto.country,
-      location,
     });
 
-    // Create role-specific profile
-    if (dto.role === UserRole.DONOR) {
-      await this.donorModel.create({
-        userId: user._id,
-        bloodType: dto.bloodType,
-        consentGiven: dto.consentGiven ?? false,
-        preferredDonationType: dto.preferredDonationType,
-        weight: dto.weight,
-        age: dto.age,
-      });
-    }
+    // Always create donor profile at registration
+    await this.donorModel.create({
+      userId: user._id,
+      bloodType: dto.bloodType,
+      consentGiven: dto.consentGiven ?? false,
+      preferredDonationType: dto.preferredDonationType,
+      weight: dto.weight,
+      age: dto.age,
+    });
 
     // const tokens = await this.generateTokens(user);
+    this.emailService
+      .sendWelcomeEmail(user.email, user.firstName)
+      .catch((err) =>
+        console.log(`Welcome email failed for ${user.email}: ${err.message}`),
+      );
 
     return {
       message: 'Registration successful',
       data: {
         user: this.sanitizeUser(user),
+        // activeRole: user.activeRole,
         // ...tokens,
       },
     };
@@ -104,14 +106,44 @@ export class AuthService {
       lastLoginAt: new Date(),
     });
 
-    const tokens = await this.generateTokens(user);
+    const isRegularUser = user.role === UserRole.USER;
+    const selectFields = isRegularUser
+      ? '-password -refreshToken'
+      : '-password -refreshToken -activeRole -usedRoles -location';
+
+    const freshUser = await this.userModel
+      .findById(user._id)
+      .select(selectFields)
+      .lean();
+    const tokens = await this.generateTokens(freshUser);
 
     return {
       message: 'Login successful',
       data: {
-        user: this.sanitizeUser(user),
+        user: freshUser,
+        role: freshUser.role,
+        ...(isRegularUser && { activeRole: (freshUser as any).activeRole }),
         ...tokens,
       },
+    };
+  }
+
+  async switchRole(userId: string, dto: SwitchRoleDto) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.role !== UserRole.USER) {
+      throw new BadRequestException(
+        'Role switching is only available for regular users',
+      );
+    }
+
+    user.activeRole = dto.activeRole;
+    await user.save();
+
+    return {
+      message: `Switched to ${dto.activeRole} mode`,
+      data: { activeRole: user.activeRole },
     };
   }
 
@@ -172,12 +204,19 @@ export class AuthService {
     const user = await this.userModel.findById(userId).lean();
     if (!user) throw new NotFoundException('User not found');
 
-    let profile = null;
-    if (user.role === UserRole.DONOR) {
-      profile = await this.donorModel.findOne({ userId }).lean();
+    let donorProfile = null;
+    if (user.role === UserRole.USER) {
+      donorProfile = await this.donorModel.findOne({ userId }).lean();
     }
 
-    return { data: { user: this.sanitizeUser(user), profile } };
+    return {
+      data: {
+        user: this.sanitizeUser(user),
+        activeRole: user.activeRole,
+        usedRoles: user.usedRoles,
+        donorProfile,
+      },
+    };
   }
 
   // ─── Private ───
@@ -187,6 +226,7 @@ export class AuthService {
       sub: user._id.toString(),
       email: user.email,
       role: user.role,
+      activeRole: user.activeRole,
     };
 
     const accessToken = this.jwtService.sign(payload, {

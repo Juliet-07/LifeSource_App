@@ -20,15 +20,16 @@ import {
   CreateBloodRequestDto,
   UpdateRecipientProfileDto,
   RequestQueryDto,
+  HospitalListQueryDto,
 } from '../../dtos';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guard';
 import { Roles, CurrentUser } from '../../../common/decorators';
-import { UserRole } from '../../../common/enums';
+import { ActiveRole } from '../../../common/enums';
 
 @ApiTags('Recipient')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.RECIPIENT)
+@Roles(ActiveRole.RECIPIENT)
 @Controller('recipient')
 export class RecipientController {
   constructor(private readonly recipientService: RecipientService) {}
@@ -48,6 +49,16 @@ export class RecipientController {
     return this.recipientService.updateProfile(userId, dto);
   }
 
+  @Get('hospitals')
+  @ApiOperation({
+    summary: 'List approved hospitals',
+    description:
+      'Returns all approved hospitals. Use the hospital _id as `hospitalId` when creating a blood request.',
+  })
+  getHospitals(@Query() query: HospitalListQueryDto) {
+    return this.recipientService.getHospitals(query);
+  }
+
   @Get('notifications')
   @ApiOperation({ summary: 'Get recipient notifications' })
   getNotifications(@CurrentUser('_id') userId: string) {
@@ -59,20 +70,17 @@ export class RecipientController {
 @ApiTags('Requests')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.RECIPIENT)
+@Roles(ActiveRole.RECIPIENT)
 @Controller('requests')
 export class RequestsController {
   constructor(private readonly recipientService: RecipientService) {}
 
   @Post()
   @ApiOperation({
-    summary: 'Create a new blood request',
+    summary: 'Create a blood request',
     description:
-      'Submit a blood request. The matching engine will find eligible donors nearby and notify them.',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Request created and matching initiated',
+      'Submit a blood request at a specific hospital. `hospitalId` is required — ' +
+      'use GET /recipient/hospitals to pick one. The matching engine will notify compatible donors.',
   })
   createRequest(
     @CurrentUser('_id') userId: string,
@@ -92,9 +100,9 @@ export class RequestsController {
 
   @Get(':id/status')
   @ApiOperation({
-    summary: 'Get blood request status',
+    summary: 'Track request status',
     description:
-      'Returns current status: pending → notified_donors → confirmed_by_hospital → fulfilled.',
+      'Status flow: pending → notified_donors → confirmed_by_hospital → fulfilled.',
   })
   getRequestStatus(
     @CurrentUser('_id') userId: string,

@@ -8,6 +8,8 @@ import { RecipientService } from './recipient.service';
 import {
   BloodRequest,
   BloodRequestSchema,
+  Hospital,
+  HospitalSchema,
   Notification,
   NotificationSchema,
   User,
@@ -18,8 +20,9 @@ import {
   imports: [
     MongooseModule.forFeature([
       { name: BloodRequest.name, schema: BloodRequestSchema },
-      { name: User.name, schema: UserSchema },
+      { name: Hospital.name, schema: HospitalSchema },
       { name: Notification.name, schema: NotificationSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [RecipientController, RequestsController],

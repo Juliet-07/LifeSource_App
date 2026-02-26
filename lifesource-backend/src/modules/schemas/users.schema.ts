@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { BloodType, UserRole } from '../../common/enums';
+import { ActiveRole, BloodType, UserRole } from '../../common/enums';
 
 export type UserDocument = User & Document;
 
@@ -18,8 +18,14 @@ export class User {
   @Prop({ required: true, select: false })
   password: string;
 
-  @Prop({ required: true, enum: UserRole })
+  @Prop({ required: true, enum: UserRole, default: UserRole.USER })
   role: UserRole;
+
+  @Prop({ enum: ActiveRole, default: ActiveRole.DONOR })
+  activeRole: ActiveRole;
+
+  @Prop({ type: [String], enum: ActiveRole, default: [] })
+  usedRoles: ActiveRole[];
 
   @Prop({ enum: BloodType })
   bloodType: BloodType;

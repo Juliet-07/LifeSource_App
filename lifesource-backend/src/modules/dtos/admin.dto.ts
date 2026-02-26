@@ -14,6 +14,35 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BroadcastTarget } from '../../common/enums';
 import { InstitutionType } from '../schemas';
 
+// ─── Super Admin ───────────────────────────────────────────────────────────────
+
+export class CreateSuperAdminDto {
+  @ApiProperty({ example: 'Admin' })
+  @IsString()
+  @IsNotEmpty()
+  firstName: string;
+
+  @ApiProperty({ example: 'Name' })
+  @IsString()
+  @IsNotEmpty()
+  lastName: string;
+
+  @ApiProperty({ example: 'admin@bloodlink.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: 'strongpassword' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @ApiPropertyOptional({ example: '+2348012345678' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}
+
+
 // ─── Hospital Management ───────────────────────────────────────────────────────
 
 export class CreateHospitalDto {

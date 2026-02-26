@@ -10,10 +10,16 @@ export enum BloodType {
 }
 
 export enum UserRole {
-  DONOR = 'donor',
-  RECIPIENT = 'recipient',
+  USER = 'user',
+  // DONOR = 'donor',
+  // RECIPIENT = 'recipient',
   HOSPITAL_ADMIN = 'hospital-admin',
   SUPER_ADMIN = 'super-admin',
+}
+
+export enum ActiveRole {
+  DONOR = 'donor',
+  RECIPIENT = 'recipient',
 }
 
 export enum RequestStatus {
@@ -23,6 +29,7 @@ export enum RequestStatus {
   FULFILLED = 'fulfilled',
   PARTIALLY_FULFILLED = 'partially_fulfilled',
   UNAVAILABLE = 'unavailable',
+  CANCELLED = 'cancelled',
 }
 
 export enum AppointmentStatus {

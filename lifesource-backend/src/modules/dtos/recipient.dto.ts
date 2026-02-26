@@ -47,7 +47,10 @@ export class CreateBloodRequestDto {
   @IsString()
   medicalCondition?: string;
 
-  @ApiPropertyOptional({ description: 'Required by date (ISO string)' })
+  @ApiPropertyOptional({
+    description: 'Required by date (ISO string)',
+    example: '2026-03-01',
+  })
   @IsOptional()
   @IsDateString()
   requiredBy?: string;
@@ -57,37 +60,29 @@ export class CreateBloodRequestDto {
   @IsString()
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'Hospital preference ID' })
-  @IsOptional()
+  @ApiProperty({
+    description:
+      'Hospital ID where blood is needed. Use GET /recipient/hospitals to get the list.',
+  })
   @IsMongoId()
-  hospitalId?: string;
-
-  @ApiPropertyOptional({ description: 'Hospital/location name' })
-  @IsOptional()
-  @IsString()
-  hospitalName?: string;
-
-  @ApiPropertyOptional({ example: 3.3792 })
-  @IsOptional()
-  @IsNumber()
-  longitude?: number;
-
-  @ApiPropertyOptional({ example: 6.5244 })
-  @IsOptional()
-  @IsNumber()
-  latitude?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  city?: string;
+  hospitalId: string;
 }
 
 export class UpdateRecipientProfileDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  name?: string;
+  firstName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -106,13 +101,13 @@ export class UpdateRecipientProfileDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  longitude?: number;
+  @IsString()
+  state?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
-  latitude?: number;
+  @IsString()
+  country?: string;
 }
 
 export class RequestQueryDto {
@@ -130,6 +125,28 @@ export class RequestQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 20 })
+  @IsOptional()
+  @IsNumber()
+  limit?: number;
+}
+
+export class HospitalListQueryDto {
+  @ApiPropertyOptional({ description: 'Search by institution name or city' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ example: 'Lagos' })
+  @IsOptional()
+  @IsString()
+  city?: string;
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

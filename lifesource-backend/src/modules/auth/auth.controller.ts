@@ -21,6 +21,7 @@ import {
   RefreshTokenDto,
   ChangePasswordDto,
   UpdateFcmTokenDto,
+  SwitchRoleDto,
 } from '../dtos';
 import { JwtAuthGuard } from './guard';
 import { CurrentUser, Public } from '../../common/decorators';
@@ -36,7 +37,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Register a new user',
     description:
-      'Register as a donor, recipient, hospital-admin, or super-admin.',
+      'Register as a user (donor, recipient), hospital-admin, or super-admin.',
   })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 409, description: 'Email already registered' })
@@ -50,7 +51,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({
     status: 200,
-    description: 'Login successful, returns JWT tokens',
+    description: 'Login successful, returns JWT tokens, and current activeRole',
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   login(@Body() dto: LoginDto) {
@@ -79,6 +80,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user profile' })
   getProfile(@CurrentUser('_id') userId: string) {
     return this.authService.getProfile(userId);
+  }
+
+  @Patch('switch-role')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Switch active role context (donor ↔ recipient)',
+    description:
+      'Users have access to both donor and recipient features. This endpoint switches which context ' +
+      'is active. Donor endpoints require activeRole="donor"; recipient endpoints require activeRole="recipient". ' +
+      'The switch is persisted and reflected in new tokens on next login.',
+  })
+  @ApiResponse({ status: 200, description: 'Role switched' })
+  switchRole(@CurrentUser('_id') userId: string, @Body() dto: SwitchRoleDto) {
+    return this.authService.switchRole(userId, dto);
   }
 
   @Patch('change-password')

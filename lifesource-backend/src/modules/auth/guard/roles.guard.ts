@@ -6,19 +6,19 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../../../common/decorators';
-import { UserRole } from '../../../common/enums';
+import { UserRole, ActiveRole } from '../../../common/enums';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
-      ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const required = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
-    if (!requiredRoles || requiredRoles.length === 0) {
+    if (!required || required.length === 0) {
       return true;
     }
 
@@ -28,14 +28,23 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Access denied');
     }
 
-    const hasRole = requiredRoles.some((role) => user.role === role);
+    for (const requiredRole of required) {
+      // Exact UserRole match (hospital-admin, super-admin, user)
+      if (user.role === requiredRole) return true;
 
-    if (!hasRole) {
-      throw new ForbiddenException(
-        `Access denied. Required role(s): ${requiredRoles.join(', ')}`,
-      );
+      // ActiveRole check — works for role=USER only
+      if (user.role === UserRole.USER) {
+        if (
+          requiredRole === ActiveRole.DONOR ||
+          requiredRole === ActiveRole.RECIPIENT
+        ) {
+          if (user.activeRole === requiredRole) return true;
+        }
+      }
     }
 
-    return true;
+    throw new ForbiddenException(
+      `Access denied. Switch to the correct role using PATCH /auth/switch-role. Required: ${required.join(', ')}`,
+    );
   }
 }

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -9,8 +10,11 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   BloodRequest,
   BloodRequestDocument,
+  Hospital,
+  HospitalDocument,
   Notification,
   NotificationDocument,
+  RequestSource,
   User,
   UserDocument,
 } from '../../schemas';
@@ -18,8 +22,13 @@ import {
   CreateBloodRequestDto,
   UpdateRecipientProfileDto,
   RequestQueryDto,
+  HospitalListQueryDto,
 } from '../../dtos';
-import { RequestStatus, NotificationType } from '../../../common/enums';
+import {
+  RequestStatus,
+  NotificationType,
+  HospitalStatus,
+} from '../../../common/enums';
 
 @Injectable()
 export class RecipientService {
@@ -27,42 +36,83 @@ export class RecipientService {
     @InjectModel(BloodRequest.name)
     private requestModel: Model<BloodRequestDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Hospital.name) private hospitalModel: Model<HospitalDocument>,
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
     private eventEmitter: EventEmitter2,
   ) {}
 
   async getProfile(userId: string) {
-    const user = await this.userModel.findById(userId).lean();
+    const user = await this.userModel
+      .findById(userId)
+      .select('-password -refreshToken')
+      .lean();
     if (!user) throw new NotFoundException('User not found');
     return { data: user };
   }
 
   async updateProfile(userId: string, dto: UpdateRecipientProfileDto) {
-    const update: any = { ...dto };
-    if (dto.longitude && dto.latitude) {
-      update.location = {
-        type: 'Point',
-        coordinates: [dto.longitude, dto.latitude],
-      };
-      delete update.longitude;
-      delete update.latitude;
-    }
-
     const user = await this.userModel
-      .findByIdAndUpdate(userId, update, { new: true })
+      .findByIdAndUpdate(userId, dto, { new: true })
+      .select('-password -refreshToken')
       .lean();
     return { message: 'Profile updated', data: user };
   }
 
+  // ─── Hospitals list (for request placement) ───────────────────────────────────
+
+  async getHospitals(query: HospitalListQueryDto) {
+    const filter: any = { status: HospitalStatus.APPROVED };
+
+    if (query.city) filter.city = new RegExp(query.city, 'i');
+    if (query.search) {
+      filter.$or = [
+        { institutionName: new RegExp(query.search, 'i') },
+        { city: new RegExp(query.search, 'i') },
+      ];
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
+    const [hospitals, total] = await Promise.all([
+      this.hospitalModel
+        .find(filter)
+        .select(
+          'institutionName institutionType officialEmail phoneNumber address city state country capacity',
+        )
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .sort({ institutionName: 1 })
+        .lean(),
+      this.hospitalModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: {
+        hospitals,
+        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+      },
+    };
+  }
+
+  // ─── Blood Requests ───────────────────────────────────────────────────────────
+
   async createRequest(userId: string, dto: CreateBloodRequestDto) {
-    const location =
-      dto.longitude && dto.latitude
-        ? { type: 'Point', coordinates: [dto.longitude, dto.latitude] }
-        : undefined;
+    // Verify hospital exists and is approved
+    const hospital = await this.hospitalModel.findOne({
+      _id: dto.hospitalId,
+      status: HospitalStatus.APPROVED,
+    });
+    if (!hospital) {
+      throw new BadRequestException(
+        'Hospital not found or not approved. Use GET /recipient/hospitals to select a valid hospital.',
+      );
+    }
 
     const request = await this.requestModel.create({
-      recipientId: userId,
+      requestSource: RequestSource.RECIPIENT,
+      requestorId: userId,
       bloodType: dto.bloodType,
       donationType: dto.donationType,
       unitsNeeded: dto.unitsNeeded,
@@ -72,19 +122,16 @@ export class RecipientService {
       medicalCondition: dto.medicalCondition,
       requiredBy: dto.requiredBy,
       notes: dto.notes,
-      hospitalId: dto.hospitalId,
-      hospitalName: dto.hospitalName,
-      city: dto.city,
-      location,
+      hospitalId: hospital._id,
+      hospitalName: hospital.institutionName,
+      city: hospital.city,
       status: RequestStatus.PENDING,
     });
 
-    // Trigger matching engine
     this.eventEmitter.emit('request.created', { request });
 
     return {
-      message:
-        'Blood request submitted successfully. We are finding donors for you.',
+      message: 'Blood request submitted. We are finding donors for you.',
       data: request,
     };
   }
@@ -105,7 +152,7 @@ export class RecipientService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('hospitalId', 'name city phone')
+        .populate('hospitalId', 'institutionName city phoneNumber address')
         .lean(),
       this.requestModel.countDocuments(filter),
     ]);
@@ -121,13 +168,12 @@ export class RecipientService {
   async getRequestStatus(userId: string, requestId: string) {
     const request = await this.requestModel
       .findById(requestId)
-      .populate('hospitalId', 'name city phone address')
+      .populate('hospitalId', 'institutionName city phoneNumber address')
       .lean();
 
     if (!request) throw new NotFoundException('Request not found');
-    if (request.recipientId.toString() !== userId) {
+    if (request.requestorId.toString() !== userId.toString())
       throw new ForbiddenException('Access denied');
-    }
 
     const respondedDonors = request.matchedDonors.filter(
       (d) => d.status === 'accepted',
@@ -150,18 +196,17 @@ export class RecipientService {
   async cancelRequest(userId: string, requestId: string) {
     const request = await this.requestModel.findById(requestId);
     if (!request) throw new NotFoundException('Request not found');
-    if (request.recipientId.toString() !== userId) {
+    if (request.requestorId.toString() !== userId.toString())
       throw new ForbiddenException('Access denied');
-    }
     if (
-      [RequestStatus.FULFILLED, RequestStatus.UNAVAILABLE].includes(
+      [RequestStatus.FULFILLED, RequestStatus.CANCELLED].includes(
         request.status,
       )
     ) {
       throw new ForbiddenException('Cannot cancel a completed request');
     }
 
-    request.status = RequestStatus.UNAVAILABLE;
+    request.status = RequestStatus.CANCELLED;
     await request.save();
 
     return { message: 'Request cancelled successfully' };
@@ -173,7 +218,6 @@ export class RecipientService {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
-
     return {
       data: {
         notifications,

@@ -11,6 +11,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { HospitalModule } from './modules/dashboard/hospital/hospital.module';
 import { RecipientModule } from './modules/dashboard/recipient/recipient.module';
 import { DonorModule } from './modules/dashboard/donor/donor.module';
+import { ReportsModule } from './modules/dashboard/report/report.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { DonorModule } from './modules/dashboard/donor/donor.module';
     DonorModule,
     HospitalModule,
     RecipientModule,
+    ReportsModule
   ],
   controllers: [AppController],
   providers: [AppService],

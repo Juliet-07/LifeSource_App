@@ -15,48 +15,13 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner";
+import {
+  timeAgo,
+  formatRequestId,
+  formatUrgency,
+  urgencyVariantMap,
+} from "@/lib/formatter";
 
-const recentRequests1 = [
-  {
-    id: "REQ-2024-001",
-    hospital: "City General Hospital",
-    type: "O- Blood",
-    urgency: "Critical",
-    status: "Pending",
-    time: "2 min ago"
-  },
-  {
-    id: "REQ-2024-002",
-    hospital: "St. Mary's Medical Center",
-    type: "A+ Platelets",
-    urgency: "High",
-    status: "In Progress",
-    time: "15 min ago"
-  },
-  {
-    id: "REQ-2024-003",
-    hospital: "Regional Health Network",
-    type: "B+ Blood",
-    urgency: "Medium",
-    status: "Fulfilled",
-    time: "1 hour ago"
-  }
-];
-
-const hospitalsPendingApproval = [
-  {
-    name: "Valley Medical Institute",
-    location: "Sacramento, CA",
-    submitted: "2 days ago",
-    documents: "Complete"
-  },
-  {
-    name: "Metro Emergency Center",
-    location: "Phoenix, AZ",
-    submitted: "5 days ago",
-    documents: "Incomplete"
-  }
-];
 
 export function Dashboard() {
   const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
@@ -77,6 +42,7 @@ export function Dashboard() {
 
   const getRecentRequests = async () => {
     const res = await axios.get(`${apiURL}/admin/requests`, { headers: authHeaders });
+    // console.log(res.data.data.requests)
     return res.data.data.requests;
   };
 
@@ -275,29 +241,28 @@ export function Dashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentRequests.length === 0 ? (<div className="flex items-center justify-center">No Recent Requests</div>) : (
-                recentRequests.map((request) => (
+                recentRequests.map((request, index) => (
                   <div key={request.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <p className="font-medium">{request.id}</p>
-                      <p className="text-sm text-muted-foreground">{request.hospital}</p>
-                      <p className="text-xs font-medium">{request.type}</p>
+                      <p className="font-medium">
+                        {formatRequestId(request._id, index)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{request?.hospitalName}</p>
+                      <p className="text-xs font-medium">{request?.bloodType}</p>
                     </div>
                     <div className="text-right space-y-1">
-                      <Badge variant={
-                        request.urgency === 'Critical' ? 'destructive' :
-                          request.urgency === 'High' ? 'secondary' : 'default'
-                      }>
-                        {request.urgency}
+                      <Badge variant={urgencyVariantMap[request.urgency] ?? "default"}>
+                        {formatUrgency(request.urgency)}
                       </Badge>
                       <div className="flex items-center text-xs text-muted-foreground">
-                        {request.status === 'Fulfilled' ? (
+                        {request.status === 'fulfilled' ? (
                           <CheckCircle className="w-3 h-3 mr-1 text-success" />
-                        ) : request.status === 'In Progress' ? (
+                        ) : request.status === 'in_progress' ? (
                           <Clock className="w-3 h-3 mr-1 text-warning" />
                         ) : (
                           <AlertTriangle className="w-3 h-3 mr-1 text-destructive" />
                         )}
-                        {request.time}
+                        {timeAgo(request.createdAt)}
                       </div>
                     </div>
                   </div>

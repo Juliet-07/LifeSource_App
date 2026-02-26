@@ -9,13 +9,28 @@ import {
 
 export type BloodRequestDocument = BloodRequest & Document;
 
+export enum RequestSource {
+  DONOR = 'donor', // donor submitting their own blood request to a hospital
+  RECIPIENT = 'recipient', // recipient requesting blood for a patient
+}
+
 @Schema({ timestamps: true })
 export class BloodRequest {
+  @Prop({
+    required: true,
+    enum: RequestSource,
+    default: RequestSource.RECIPIENT,
+  })
+  requestSource: RequestSource;
+
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  recipientId: Types.ObjectId;
+  requestorId: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Hospital' })
-  hospitalId: Types.ObjectId; // Assigned hospital
+  hospitalId: Types.ObjectId;
+
+  @Prop()
+  hospitalName: string;
 
   @Prop({ required: true, enum: BloodType })
   bloodType: BloodType;
@@ -23,13 +38,13 @@ export class BloodRequest {
   @Prop({ enum: DonationType, default: DonationType.WHOLE_BLOOD })
   donationType: DonationType;
 
-  @Prop({ required: true, min: 1 })
+  @Prop({ min: 1 })
   unitsNeeded: number;
 
   @Prop({ default: 0 })
   unitsFulfilled: number;
 
-  @Prop({ required: true, enum: UrgencyLevel, default: UrgencyLevel.MEDIUM })
+  @Prop({ enum: UrgencyLevel, default: UrgencyLevel.MEDIUM })
   urgency: UrgencyLevel;
 
   @Prop({
@@ -49,10 +64,13 @@ export class BloodRequest {
   medicalCondition: string;
 
   @Prop()
-  requiredBy: Date; // Deadline
+  requiredBy: Date;
 
   @Prop()
   notes: string;
+
+  @Prop()
+  city: string;
 
   // Location for proximity matching
   @Prop({
@@ -64,12 +82,6 @@ export class BloodRequest {
     coordinates: [Number],
   })
   location: { type: string; coordinates: number[] };
-
-  @Prop()
-  city: string;
-
-  @Prop()
-  hospitalName: string;
 
   // Matched donors
   @Prop({

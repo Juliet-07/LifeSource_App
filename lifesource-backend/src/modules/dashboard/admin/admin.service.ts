@@ -37,6 +37,7 @@ import {
   SuspendUserDto,
   RejectHospitalDto,
   UpdateHospitalDto,
+  CreateSuperAdminDto,
 } from '../../dtos';
 import {
   HospitalStatus,
@@ -44,6 +45,7 @@ import {
   NotificationType,
   BloodType,
   UserRole,
+  ActiveRole,
 } from '../../../common/enums';
 import { EmailService } from 'src/common/utils/email.service';
 
@@ -83,9 +85,12 @@ export class AdminService {
       bloodTypeDistribution,
       inventoryByBloodType,
     ] = await Promise.all([
-      this.userModel.countDocuments({ role: UserRole.DONOR }),
-      this.userModel.countDocuments({ role: UserRole.DONOR, isActive: true }),
-      this.userModel.countDocuments({ role: UserRole.RECIPIENT }),
+      this.userModel.countDocuments({ role: UserRole.USER }),
+      this.userModel.countDocuments({ role: UserRole.USER, isActive: true }),
+      this.userModel.countDocuments({
+        role: UserRole.USER,
+        usedRoles: ActiveRole.RECIPIENT,
+      }),
       this.hospitalModel.countDocuments(),
       this.hospitalModel.countDocuments({ status: HospitalStatus.APPROVED }),
       this.hospitalModel.countDocuments({ status: HospitalStatus.PENDING }),
@@ -97,10 +102,10 @@ export class AdminService {
         .find()
         .sort({ createdAt: -1 })
         .limit(10)
-        .populate('hospitalId', 'name')
+        .populate('hospitalId', 'institutionName')
         .lean(),
       this.userModel.aggregate([
-        { $match: { role: UserRole.DONOR } },
+        { $match: { role: UserRole.USER } },
         { $group: { _id: '$bloodType', count: { $sum: 1 } } },
       ]),
       this.inventoryModel.aggregate([
@@ -134,6 +139,41 @@ export class AdminService {
         bloodTypeDistribution,
         inventoryByBloodType,
       },
+    };
+  }
+
+  // ─── Global Dashboard ─────────────────────────────────────────────────────────
+  async createSuperAdmin(dto: CreateSuperAdminDto, createdBy?: string) {
+    const existing = await this.userModel.findOne({
+      email: dto.email.toLowerCase(),
+    });
+    if (existing) throw new ConflictException('Email is already registered');
+
+    const hashed = await bcrypt.hash(dto.password, 12);
+
+    const admin = await this.userModel.create({
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      email: dto.email.toLowerCase(),
+      password: hashed,
+      role: UserRole.SUPER_ADMIN,
+      phone: dto.phone,
+      isActive: true,
+      isEmailVerified: true,
+    });
+
+    console.log(
+      `🔐 Super-admin created: ${admin.email}` +
+        (createdBy ? ` by admin ${createdBy}` : ' via bootstrap'),
+    );
+
+    const obj = admin.toObject() as any;
+    delete obj.password;
+    delete obj.refreshToken;
+
+    return {
+      message: 'Super-admin account created successfully',
+      data: obj,
     };
   }
 
@@ -402,6 +442,9 @@ export class AdminService {
   async getAllRequests(query: AdminQueryDto) {
     const filter: any = {};
     if (query.status) filter.status = query.status;
+    if (query.search) {
+      filter.$or = [{ patientName: new RegExp(query.search, 'i') }];
+    }
 
     const page = query.page || 1;
     const limit = query.limit || 20;
@@ -412,15 +455,24 @@ export class AdminService {
         .skip((page - 1) * limit)
         .limit(limit)
         .sort({ urgency: 1, createdAt: -1 })
-        .populate('recipientId', 'firstName lastName email')
+        .populate('requestorId', 'firstName lastName email bloodType')
         .populate('hospitalId', 'institutionName city')
         .lean(),
       this.requestModel.countDocuments(filter),
     ]);
 
+    // Label each request clearly for admin display
+    const labeled = requests.map((r: any) => ({
+      ...r,
+      requestType:
+        r.requestSource === 'donor'
+          ? '🩸 Donor Request (donor coming to donate)'
+          : '🏥 Recipient Request (patient needs blood)',
+    }));
+
     return {
       data: {
-        requests,
+        requests: labeled,
         pagination: { total, page, limit, pages: Math.ceil(total / limit) },
       },
     };
@@ -457,19 +509,19 @@ export class AdminService {
   async createBroadcast(adminId: string, dto: CreateBroadcastDto) {
     const userFilter: any = { isActive: true };
     if (dto.target !== 'all') {
-      const roleMap: Record<string, UserRole> = {
-        donors: UserRole.DONOR,
-        recipients: UserRole.RECIPIENT,
-        hospitals: UserRole.HOSPITAL_ADMIN,
-      };
-      userFilter.role = roleMap[dto.target];
+      if (dto.target === 'hospitals') {
+        userFilter.role = UserRole.HOSPITAL_ADMIN;
+      } else if (dto.target === 'donors') {
+        userFilter.role = UserRole.USER;
+        userFilter.usedRoles = ActiveRole.DONOR;
+      } else if (dto.target === 'recipients') {
+        userFilter.role = UserRole.USER;
+        userFilter.usedRoles = ActiveRole.RECIPIENT;
+      }
     }
-    if (dto.targetBloodTypes?.length > 0) {
+    if (dto.targetBloodTypes?.length)
       userFilter.bloodType = { $in: dto.targetBloodTypes };
-    }
-    if (dto.targetCities?.length > 0) {
-      userFilter.city = { $in: dto.targetCities };
-    }
+    if (dto.targetCities?.length) userFilter.city = { $in: dto.targetCities };
 
     const targetUsers = await this.userModel
       .find(userFilter)
@@ -497,9 +549,7 @@ export class AdminService {
       data: { broadcastId: broadcast._id },
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     }));
-
     await this.notificationModel.insertMany(notifications);
-
     await this.broadcastModel.findByIdAndUpdate(broadcast._id, {
       delivered: totalRecipients,
     });
@@ -508,7 +558,7 @@ export class AdminService {
 
     return {
       message: `Broadcast sent to ${totalRecipients} users`,
-      data: { ...broadcast.toObject(), totalRecipients },
+      data: broadcast,
     };
   }
 
@@ -538,13 +588,16 @@ export class AdminService {
   // ─── User Management — Donors ─────────────────────────────────────────────────
 
   async getDonors(query: UserManagementQueryDto) {
-    const userFilter: any = { role: UserRole.DONOR };
+    const userFilter: any = {
+      role: UserRole.USER,
+      // usedRoles: ActiveRole.DONOR,
+    };
     this.applyUserFilter(userFilter, query);
 
     const page = query.page || 1;
     const limit = query.limit || 20;
 
-    const [donors, total] = await Promise.all([
+    const [users, total] = await Promise.all([
       this.userModel
         .find(userFilter)
         .select('-password -refreshToken')
@@ -555,23 +608,25 @@ export class AdminService {
       this.userModel.countDocuments(userFilter),
     ]);
 
-    const donorIds = donors.map((d) => d._id);
+    const userIds = users.map((u) => u._id);
     const donorProfiles = await this.donorModel
-      .find({ userId: { $in: donorIds } })
+      .find({ userId: { $in: userIds } })
       .lean();
 
     const profileMap = new Map(
       donorProfiles.map((p) => [p.userId.toString(), p]),
     );
 
-    const enriched = donors.map((u) => ({
+    const enriched = users.map((u) => ({
       ...u,
       donorProfile: profileMap.get(u._id.toString()) || null,
+      hasActedAsDonor: (u.usedRoles || []).includes(ActiveRole.DONOR),
+      hasActedAsRecipient: (u.usedRoles || []).includes(ActiveRole.RECIPIENT),
     }));
 
     return {
       data: {
-        donors: enriched,
+        users: enriched,
         pagination: { total, page, limit, pages: Math.ceil(total / limit) },
       },
     };
@@ -579,7 +634,11 @@ export class AdminService {
 
   async getDonorById(userId: string) {
     const user = await this.userModel
-      .findOne({ _id: userId, role: UserRole.DONOR })
+      .findOne({
+        _id: userId,
+        role: UserRole.USER,
+        usedRoles: ActiveRole.DONOR,
+      })
       .select('-password -refreshToken')
       .lean();
     if (!user) throw new NotFoundException('Donor not found');
@@ -601,17 +660,20 @@ export class AdminService {
   }
 
   async suspendDonor(adminId: string, userId: string, dto: SuspendUserDto) {
-    return this.setUserActiveStatus(userId, false, dto.reason, UserRole.DONOR);
+    return this.setUserActiveStatus(userId, false, dto.reason, UserRole.USER);
   }
 
   async reactivateDonor(adminId: string, userId: string) {
-    return this.setUserActiveStatus(userId, true, null, UserRole.DONOR);
+    return this.setUserActiveStatus(userId, true, null, UserRole.USER);
   }
 
   // ─── User Management — Recipients ────────────────────────────────────────────
 
   async getRecipients(query: UserManagementQueryDto) {
-    const userFilter: any = { role: UserRole.RECIPIENT };
+    const userFilter: any = {
+      role: UserRole.USER,
+      usedRoles: ActiveRole.RECIPIENT,
+    };
     this.applyUserFilter(userFilter, query);
 
     const page = query.page || 1;
@@ -638,7 +700,11 @@ export class AdminService {
 
   async getRecipientById(userId: string) {
     const user = await this.userModel
-      .findOne({ _id: userId, role: UserRole.RECIPIENT })
+      .findOne({
+        _id: userId,
+        role: UserRole.USER,
+        usedRoles: ActiveRole.RECIPIENT,
+      })
       .select('-password -refreshToken')
       .lean();
     if (!user) throw new NotFoundException('Recipient not found');
@@ -657,16 +723,11 @@ export class AdminService {
   }
 
   async suspendRecipient(adminId: string, userId: string, dto: SuspendUserDto) {
-    return this.setUserActiveStatus(
-      userId,
-      false,
-      dto.reason,
-      UserRole.RECIPIENT,
-    );
+    return this.setUserActiveStatus(userId, false, dto.reason, UserRole.USER);
   }
 
   async reactivateRecipient(adminId: string, userId: string) {
-    return this.setUserActiveStatus(userId, true, null, UserRole.RECIPIENT);
+    return this.setUserActiveStatus(userId, true, null, UserRole.USER);
   }
 
   // ─── Reports & Analytics ──────────────────────────────────────────────────────
