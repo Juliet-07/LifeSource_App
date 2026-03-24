@@ -22,6 +22,7 @@ import {
   ChangePasswordDto,
   UpdateFcmTokenDto,
   SwitchRoleDto,
+  BootstrapSuperAdminDto,
 } from '../dtos';
 import { JwtAuthGuard } from './guard';
 import { CurrentUser, Public } from '../../common/decorators';
@@ -31,6 +32,25 @@ import { CurrentUser, Public } from '../../common/decorators';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Post('bootstrap')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'First-time platform setup — create the first super-admin',
+    description:
+      'This endpoint is only available when **no super-admin account exists** in the database. ' +
+      'Once the first super-admin is created, this endpoint permanently returns 403. ' +
+      'Use POST /admin/super-admin for all subsequent super-admin creation.',
+  })
+  @ApiResponse({ status: 201, description: 'First super-admin created' })
+  @ApiResponse({
+    status: 403,
+    description: 'Bootstrap disabled — super-admin already exists',
+  })
+  bootstrap(@Body() dto: BootstrapSuperAdminDto) {
+    return this.authService.bootstrap(dto);
+  }
 
   @Public()
   @Post('register')

@@ -13,8 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { User, Settings, LogOut, ChevronDown } from "lucide-react";
 
 interface AdminUser {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   role: string;
 }
@@ -34,13 +33,6 @@ export function UserProfileDropdown() {
     navigate("/");
   };
 
-  const fullName = user
-    ? `${user.firstName} ${user.lastName}`
-    : "Admin";
-
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
-  };
 
   return (
     <DropdownMenu>
@@ -48,15 +40,13 @@ export function UserProfileDropdown() {
         <Button variant="ghost" className="flex items-center gap-2 px-2">
           <Avatar className="w-8 h-8">
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-              {user
-                ? getInitials(user.firstName, user.lastName)
-                : "SA"}
+              SA
             </AvatarFallback>
           </Avatar>
 
           <div className="hidden md:flex flex-col items-start text-left">
             <span className="text-sm font-medium">
-              {fullName}
+              {user?.name ?? "Admin"}
             </span>
             <span className="text-xs text-muted-foreground">
               {user?.role ?? "Super Admin"}
@@ -74,7 +64,7 @@ export function UserProfileDropdown() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium">
-              {fullName}
+              {user?.name}
             </p>
             <p className="text-xs text-muted-foreground">
               {user?.email ?? "admin@lifesource.com"}

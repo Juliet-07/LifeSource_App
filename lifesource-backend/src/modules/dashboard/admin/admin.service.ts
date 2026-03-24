@@ -152,8 +152,7 @@ export class AdminService {
     const hashed = await bcrypt.hash(dto.password, 12);
 
     const admin = await this.userModel.create({
-      firstName: dto.firstName,
-      lastName: dto.lastName,
+      name: dto.name,
       email: dto.email.toLowerCase(),
       password: hashed,
       role: UserRole.SUPER_ADMIN,

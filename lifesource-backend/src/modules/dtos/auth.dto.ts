@@ -130,3 +130,24 @@ export class UpdateFcmTokenDto {
   @IsNotEmpty()
   fcmToken: string;
 }
+
+export class BootstrapSuperAdminDto {
+  @ApiProperty({ example: 'Platform Admin' })
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @ApiProperty({ example: 'admin@lifesourceapp.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @ApiPropertyOptional({ example: '+2348012345678' })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}

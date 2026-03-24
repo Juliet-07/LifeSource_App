@@ -21,12 +21,16 @@ import {
   formatUrgency,
   urgencyVariantMap,
 } from "@/lib/formatter";
+import { useState } from "react";
+import { Textarea } from "../ui/textarea";
 
 
 export function Dashboard() {
   const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
   const token = localStorage.getItem("adminToken");
   const queryClient = useQueryClient()
+  const [rejectModal, setRejectModal] = useState<{ hospitalId: string; institutionName: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const authHeaders = {
     Authorization: `Bearer ${token}`,
@@ -94,11 +98,50 @@ export function Dashboard() {
     },
   });
 
+  // ─── Reject mutation ───────────────────────────────────────────────────────
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ hospitalId, reason }: { hospitalId: string; reason: string }) =>
+      axios.patch(
+        `${apiURL}/admin/hospitals/${hospitalId}/reject`,
+        { reason },
+        { headers: authHeaders },
+      ),
+    onSuccess: (_, hospitalId) => {
+      toast.success("Hospital rejected successfully.");
+      queryClient.setQueryData(["PendingHospitals"], (prev: any[]) =>
+        (prev ?? []).filter((h) => h._id !== hospitalId),
+      );
+      queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+      setRejectModal(null)
+      setRejectReason("")
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ?? "Failed to reject hospital. Please try again.";
+      toast.error(message);
+    },
+  });
+
+
   const handleApprove = (hospitalId: string, institutionName: string) => {
     if (!window.confirm(`Approve "${institutionName}"? An admin account will be created and credentials will be emailed to the contact.`)) {
       return;
     }
     approveMutation.mutate(hospitalId);
+  };
+
+  const handleRejectClick = (hospitalId: string, institutionName: string) => {
+    setRejectReason("");
+    setRejectModal({ hospitalId, institutionName });
+  };
+
+  const handleRejectConfirm = () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please provide a reason for rejection.");
+      return;
+    }
+    rejectMutation.mutate({ hospitalId: rejectModal!.hospitalId, reason: rejectReason });
   };
 
   return (
@@ -319,8 +362,8 @@ export function Dashboard() {
                               "Approve"
                             )}
                           </Button>
-                          <Button size="sm" variant="outline" className="h-7 text-xs">
-                            Review
+                          <Button size="sm" variant="outline" className="h-7 text-xs bg-destructive text-white" onClick={() => handleRejectClick(hospital._id, hospital.institutionName)}>
+                            Reject
                           </Button>
                         </div>
                       </div>
@@ -331,6 +374,55 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+      {/* Reject Reason Modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader>
+              <CardTitle>Reject Institution</CardTitle>
+              <CardDescription>
+                You are rejecting <span className="font-medium text-foreground">{rejectModal.institutionName}</span>.
+                Please provide a reason below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="rejectReason">Reason for Rejection *</label>
+                <Textarea
+                  id="rejectReason"
+                  placeholder="e.g., Incomplete documentation, invalid license number..."
+                  rows={4}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setRejectModal(null)}
+                  disabled={rejectMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleRejectConfirm}
+                  disabled={rejectMutation.isPending}
+                >
+                  {rejectMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Rejecting…
+                    </>
+                  ) : (
+                    "Confirm Reject"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

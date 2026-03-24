@@ -159,7 +159,7 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -192,14 +192,14 @@ export function HospitalDetails({ hospitalId, onBack }: HospitalDetailsProps) {
             </div>
           </CardContent>
         </Card>
-        <Card className="shadow-soft">
+        {/* <Card className="shadow-soft">
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-2xl font-bold">2</p>
               <p className="text-sm text-muted-foreground">Blood Units</p>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       {/* Tabs */}

@@ -6,10 +6,13 @@ export type UserDocument = User & Document;
 
 @Schema({ timestamps: true, discriminatorKey: 'role' })
 export class User {
-  @Prop({ required: true, trim: true })
+  @Prop()
+  name: string;
+
+  @Prop()
   firstName: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop()
   lastName: string;
 
   @Prop({ required: true, unique: true, lowercase: true, trim: true })

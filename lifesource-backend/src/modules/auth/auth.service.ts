@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -18,6 +19,7 @@ import {
   ChangePasswordDto,
   UpdateFcmTokenDto,
   SwitchRoleDto,
+  BootstrapSuperAdminDto,
 } from '../dtos';
 import { ActiveRole, UserRole } from '../../common/enums';
 import { EmailService } from 'src/common/utils/email.service';
@@ -31,6 +33,47 @@ export class AuthService {
     private configService: ConfigService,
     private readonly emailService: EmailService,
   ) {}
+
+  async bootstrap(dto: BootstrapSuperAdminDto) {
+    // Self-disabling: only works when zero super-admins exist
+    const existingAdmin = await this.userModel.findOne({
+      role: UserRole.SUPER_ADMIN,
+    });
+    if (existingAdmin) {
+      throw new ForbiddenException(
+        'Bootstrap is disabled — a super-admin account already exists. ' +
+          'Use POST /admin/super-admin with an existing super-admin token.',
+      );
+    }
+
+    const existing = await this.userModel.findOne({
+      email: dto.email.toLowerCase(),
+    });
+    if (existing) throw new ConflictException('Email is already registered');
+
+    const hashed = await bcrypt.hash(dto.password, 12);
+
+    const admin = await this.userModel.create({
+      name: dto.name,
+      email: dto.email.toLowerCase(),
+      password: hashed,
+      role: UserRole.SUPER_ADMIN,
+      phone: dto.phone,
+      isActive: true,
+      isEmailVerified: true,
+    });
+
+    const obj = admin.toObject() as any;
+    delete obj.password;
+    delete obj.refreshToken;
+
+    return {
+      message:
+        'First super-admin created successfully. ' +
+        'This bootstrap endpoint is now permanently disabled.',
+      data: obj,
+    };
+  }
 
   async register(dto: RegisterDto) {
     // Check unique email

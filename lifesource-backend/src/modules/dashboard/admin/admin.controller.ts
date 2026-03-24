@@ -28,6 +28,7 @@ import {
   UserManagementQueryDto,
   SuspendUserDto,
   UpdateHospitalDto,
+  CreateSuperAdminDto,
 } from '../../dtos';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guard';
 import { Roles, CurrentUser } from '../../../common/decorators';
@@ -40,6 +41,26 @@ import { UserRole } from '../../../common/enums';
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN MANAGEMENT
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  @Post('super-admin')
+  @ApiOperation({
+    summary: 'Create a new super-admin account',
+    description:
+      'Only an existing super-admin can call this. ' +
+      'For first-time platform setup (no super-admin exists yet), use POST /auth/bootstrap instead.',
+  })
+  @ApiResponse({ status: 201, description: 'Super-admin created' })
+  @ApiResponse({ status: 409, description: 'Email already registered' })
+  createSuperAdmin(
+    @CurrentUser('_id') adminId: string,
+    @Body() dto: CreateSuperAdminDto,
+  ) {
+    return this.adminService.createSuperAdmin(dto, adminId);
+  }
 
   // ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -164,13 +185,17 @@ export class AdminController {
     return this.adminService.redirectRequest(adminId, requestId, dto);
   }
 
-  // ─── User Management ───────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════════════
+  // USER MANAGEMENT — DONORS
+  // ══════════════════════════════════════════════════════════════════════════════
+
   @Get('users/donors')
   @ApiOperation({
-    summary: 'Get all donors',
+    summary: 'Get all users (donor view)',
     description:
-      'Returns donor user accounts enriched with their donor profile (eligibility, total donations, points, badges). ' +
-      'Filter by bloodType, city, isActive, or search by name/email.',
+      'Returns ALL UserRole.USER accounts enriched with their donor profile. ' +
+      'Every registered user has donor access — `hasActedAsDonor: true` means they have actually logged a donation. ' +
+      'Use ?activityFilter=active to show only users who have donated at least once.',
   })
   getDonors(@Query() query: UserManagementQueryDto) {
     return this.adminService.getDonors(query);
@@ -205,11 +230,17 @@ export class AdminController {
     return this.adminService.reactivateDonor(adminId, userId);
   }
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // USER MANAGEMENT — RECIPIENTS
+  // ══════════════════════════════════════════════════════════════════════════════
+
   @Get('users/recipients')
   @ApiOperation({
-    summary: 'Get all recipients',
+    summary: 'Get all users (recipient view)',
     description:
-      'Filter by bloodType, city, isActive, or search by name/email.',
+      'Returns ALL UserRole.USER accounts. ' +
+      '`hasActedAsRecipient: true` means the user has submitted at least one blood request. ' +
+      'Use ?activityFilter=active to show only users who have made a request.',
   })
   getRecipients(@Query() query: UserManagementQueryDto) {
     return this.adminService.getRecipients(query);

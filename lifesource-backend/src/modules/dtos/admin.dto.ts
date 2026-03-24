@@ -20,12 +20,7 @@ export class CreateSuperAdminDto {
   @ApiProperty({ example: 'Admin' })
   @IsString()
   @IsNotEmpty()
-  firstName: string;
-
-  @ApiProperty({ example: 'Name' })
-  @IsString()
-  @IsNotEmpty()
-  lastName: string;
+  name: string;
 
   @ApiProperty({ example: 'admin@bloodlink.com' })
   @IsEmail()

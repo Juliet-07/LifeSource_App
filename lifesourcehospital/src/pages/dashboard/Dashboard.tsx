@@ -30,7 +30,7 @@ const navItems = [
   { path: '/dashboard/requests', label: 'Requests', icon: Heart },
   { path: '/dashboard/appointments', label: 'Appointments', icon: Calendar },
   { path: '/dashboard/inventory', label: 'Inventory', icon: Droplets },
-  { path: '/dashboard/people', label: 'Donors & Recipients', icon: Users },
+  // { path: '/dashboard/people', label: 'Donors & Recipients', icon: Users },
   { path: '/dashboard/reports', label: 'Reports', icon: FileText },
   // { path: '/dashboard/settings', label: 'Hospital Settings', icon: Settings },
 ];

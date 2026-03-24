@@ -5,47 +5,80 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, ArrowLeft, Save, Plus } from "lucide-react";
+import { Building2, ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import axios from "axios";
 
 interface AddHospitalFormProps {
   onBack: () => void;
 }
 
 export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
-  const [formData, setFormData] = useState({
-    type: "",
-    name: "",
-    email: "",
-    phone: "",
+  const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
+  const token = localStorage.getItem("adminToken");
+  const { handleSubmit } = useForm();
+  const [loading, setLoading] = useState(false);
+
+  const initialValues = {
+    institutionType: "",
+    institutionName: "",
+    officialEmail: "",
+    phoneNumber: "",
+    licenseRegNo: "",
+    capacity: 0,
     address: "",
     city: "",
     state: "",
     zipCode: "",
     country: "",
-    capacity: "",
-    licenseNumber: "",
-    contactPersonName: "",
-    contactPersonEmail: "",
-    contactPersonPhone: "",
-    description: "",
-  });
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    contactFullName: "",
+    contactEmail: "",
+    contactPhone: "",
+    note: "",
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.type || !formData.name || !formData.email || !formData.phone) {
+  const [formData, setFormData] = useState(initialValues);
+
+  // Handles both native input events and direct (key, value) calls from Select
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | string,
+    directValue?: string
+  ) => {
+    if (typeof e === "string") {
+      // Called as handleInputChange("fieldName", value) from Select
+      setFormData((prev) => ({ ...prev, [e]: directValue ?? "" }));
+    } else {
+      const { name, value } = e.target;
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleAddHospital = async () => {
+    if (!formData.institutionType || !formData.institutionName || !formData.officialEmail) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    // Here you would typically send to backend
-    toast.success(`${formData.type === 'hospital' ? 'Hospital' : 'Blood Bank'} added successfully!`);
-    onBack();
+    setLoading(true);
+    try {
+      await axios.post(`${apiURL}/admin/hospitals`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      toast.success(
+        `${formData.institutionType === "hospital" ? "Hospital" : "Blood Bank"} added successfully!`
+      );
+      onBack();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || "Failed to add institution. Please try again.";
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -63,7 +96,7 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit(handleAddHospital)}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Institution Type & Basic Info */}
           <Card className="shadow-soft">
@@ -72,14 +105,15 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
                 <Building2 className="w-5 h-5 mr-2" />
                 Institution Information
               </CardTitle>
-              <CardDescription>
-                Basic details about the institution
-              </CardDescription>
+              <CardDescription>Basic details about the institution</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="type">Institution Type *</Label>
-                <Select value={formData.type} onValueChange={(value) => handleInputChange("type", value)}>
+                <Label htmlFor="institutionType">Institution Type *</Label>
+                <Select
+                  value={formData.institutionType}
+                  onValueChange={(value) => handleInputChange("institutionType", value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -91,43 +125,47 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Institution Name *</Label>
+                <Label htmlFor="institutionName">Institution Name *</Label>
                 <Input
-                  id="name"
+                  id="institutionName"
+                  name="institutionName"
                   placeholder="e.g., City General Hospital"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  value={formData.institutionName}
+                  onChange={handleInputChange}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Official Email *</Label>
+                <Label htmlFor="officialEmail">Official Email *</Label>
                 <Input
-                  id="email"
+                  id="officialEmail"
+                  name="officialEmail"
                   type="email"
                   placeholder="contact@hospital.org"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  value={formData.officialEmail}
+                  onChange={handleInputChange}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
+                <Label htmlFor="phoneNumber">Phone Number *</Label>
                 <Input
-                  id="phone"
+                  id="phoneNumber"
+                  name="phoneNumber"
                   placeholder="+1 (555) 123-4567"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="licenseNumber">License Number</Label>
+                <Label htmlFor="licenseRegNo">License Number</Label>
                 <Input
-                  id="licenseNumber"
+                  id="licenseRegNo"
+                  name="licenseRegNo"
                   placeholder="License/Registration number"
-                  value={formData.licenseNumber}
-                  onChange={(e) => handleInputChange("licenseNumber", e.target.value)}
+                  value={formData.licenseRegNo}
+                  onChange={handleInputChange}
                 />
               </div>
 
@@ -135,10 +173,11 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
                 <Label htmlFor="capacity">Capacity (beds/units)</Label>
                 <Input
                   id="capacity"
+                  name="capacity"
                   type="number"
                   placeholder="e.g., 500"
                   value={formData.capacity}
-                  onChange={(e) => handleInputChange("capacity", e.target.value)}
+                  onChange={handleInputChange}
                 />
               </div>
             </CardContent>
@@ -148,18 +187,17 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
           <Card className="shadow-soft">
             <CardHeader>
               <CardTitle>Location Details</CardTitle>
-              <CardDescription>
-                Address and geographic information
-              </CardDescription>
+              <CardDescription>Address and geographic information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="address">Street Address</Label>
                 <Input
                   id="address"
+                  name="address"
                   placeholder="123 Medical Center Drive"
                   value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  onChange={handleInputChange}
                 />
               </div>
 
@@ -168,18 +206,20 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
                   <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
+                    name="city"
                     placeholder="Los Angeles"
                     value={formData.city}
-                    onChange={(e) => handleInputChange("city", e.target.value)}
+                    onChange={handleInputChange}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="state">State/Province</Label>
                   <Input
                     id="state"
+                    name="state"
                     placeholder="California"
                     value={formData.state}
-                    onChange={(e) => handleInputChange("state", e.target.value)}
+                    onChange={handleInputChange}
                   />
                 </div>
               </div>
@@ -189,18 +229,20 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
                   <Label htmlFor="zipCode">ZIP/Postal Code</Label>
                   <Input
                     id="zipCode"
+                    name="zipCode"
                     placeholder="90001"
                     value={formData.zipCode}
-                    onChange={(e) => handleInputChange("zipCode", e.target.value)}
+                    onChange={handleInputChange}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country</Label>
                   <Input
                     id="country"
+                    name="country"
                     placeholder="United States"
                     value={formData.country}
-                    onChange={(e) => handleInputChange("country", e.target.value)}
+                    onChange={handleInputChange}
                   />
                 </div>
               </div>
@@ -211,39 +253,40 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
           <Card className="shadow-soft">
             <CardHeader>
               <CardTitle>Primary Contact Person</CardTitle>
-              <CardDescription>
-                Main point of contact at the institution
-              </CardDescription>
+              <CardDescription>Main point of contact at the institution</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="contactPersonName">Full Name</Label>
+                <Label htmlFor="contactFullName">Full Name</Label>
                 <Input
-                  id="contactPersonName"
+                  id="contactFullName"
+                  name="contactFullName"
                   placeholder="Dr. John Smith"
-                  value={formData.contactPersonName}
-                  onChange={(e) => handleInputChange("contactPersonName", e.target.value)}
+                  value={formData.contactFullName}
+                  onChange={handleInputChange}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contactPersonEmail">Email</Label>
+                <Label htmlFor="contactEmail">Email</Label>
                 <Input
-                  id="contactPersonEmail"
+                  id="contactEmail"
+                  name="contactEmail"
                   type="email"
                   placeholder="john.smith@hospital.org"
-                  value={formData.contactPersonEmail}
-                  onChange={(e) => handleInputChange("contactPersonEmail", e.target.value)}
+                  value={formData.contactEmail}
+                  onChange={handleInputChange}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="contactPersonPhone">Phone</Label>
+                <Label htmlFor="contactPhone">Phone</Label>
                 <Input
-                  id="contactPersonPhone"
+                  id="contactPhone"
+                  name="contactPhone"
                   placeholder="+1 (555) 987-6543"
-                  value={formData.contactPersonPhone}
-                  onChange={(e) => handleInputChange("contactPersonPhone", e.target.value)}
+                  value={formData.contactPhone}
+                  onChange={handleInputChange}
                 />
               </div>
             </CardContent>
@@ -253,19 +296,18 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
           <Card className="shadow-soft">
             <CardHeader>
               <CardTitle>Additional Information</CardTitle>
-              <CardDescription>
-                Any other relevant details
-              </CardDescription>
+              <CardDescription>Any other relevant details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="description">Description / Notes</Label>
+                <Label htmlFor="note">Description / Notes</Label>
                 <Textarea
-                  id="description"
+                  id="note"
+                  name="note"
                   placeholder="Add any additional information about the institution..."
                   rows={6}
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
+                  value={formData.note}
+                  onChange={handleInputChange}
                 />
               </div>
             </CardContent>
@@ -274,12 +316,12 @@ export function AddHospitalForm({ onBack }: AddHospitalFormProps) {
 
         {/* Form Actions */}
         <div className="flex justify-end gap-3 mt-6">
-          <Button type="button" variant="outline" onClick={onBack}>
+          <Button type="button" variant="outline" onClick={onBack} disabled={loading}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+          <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={loading}>
             <Save className="w-4 h-4 mr-2" />
-            Save Institution
+            {loading ? "Saving..." : "Save Institution"}
           </Button>
         </div>
       </form>
