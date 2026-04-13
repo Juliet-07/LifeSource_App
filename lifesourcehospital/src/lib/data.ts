@@ -1,5 +1,3 @@
-// Mock data for the hospital management system
-
 export interface HospitalInfo {
   id: string;
   name: string;

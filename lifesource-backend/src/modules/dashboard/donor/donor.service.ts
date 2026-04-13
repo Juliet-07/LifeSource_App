@@ -3,12 +3,15 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  Appointment,
+  AppointmentDocument,
   BloodRequest,
   BloodRequestDocument,
   Donor,
@@ -17,19 +20,23 @@ import {
   DonationDocument,
   Notification,
   NotificationDocument,
-  User,
   UserDocument,
   Hospital,
   HospitalDocument,
   RequestSource,
+  User,
 } from '../../schemas';
 import {
   UpdateDonorProfileDto,
   LogDonationDto,
   RespondToRequestDto,
   HospitalListQueryDto,
+  ScheduleAppointmentDto,
+  AppointmentQueryDto,
+  CancelAppointmentDto,
 } from '../../dtos';
 import {
+  AppointmentStatus,
   DonationType,
   HospitalStatus,
   NotificationType,
@@ -61,6 +68,8 @@ const DONATION_POINTS: Record<DonationType, number> = {
 @Injectable()
 export class DonorService {
   constructor(
+    @InjectModel(Appointment.name)
+    private appointmentModel: Model<AppointmentDocument>,
     @InjectModel(Donor.name) private donorModel: Model<DonorDocument>,
     @InjectModel(Donation.name) private donationModel: Model<DonationDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -210,42 +219,184 @@ export class DonorService {
     return { message: 'Profile updated', data: donor };
   }
 
-  // ─── Hospitals list (for donation logging) ────────────────────────────────────
+  // ─── Appointments (donor-initiated) ───────────────────────────────────────────
 
-  async getHospitals(query: HospitalListQueryDto) {
-    const filter: any = { status: HospitalStatus.APPROVED };
-
-    if (query.city) filter.city = new RegExp(query.city, 'i');
-    if (query.search) {
-      filter.$or = [
-        { institutionName: new RegExp(query.search, 'i') },
-        { city: new RegExp(query.search, 'i') },
-      ];
+  async scheduleAppointment(userId: string, dto: ScheduleAppointmentDto) {
+    // Verify hospital exists and is approved
+    const hospital = await this.hospitalModel.findOne({
+      _id: dto.hospitalId,
+      status: { $in: ['approved', 'APPROVED'] },
+    });
+    if (!hospital) {
+      throw new NotFoundException(
+        'Hospital not found or not approved. Use GET /hospitals to select a valid hospital.',
+      );
     }
+
+    const scheduledAt = new Date(dto.scheduledAt);
+    if (scheduledAt <= new Date()) {
+      throw new BadRequestException('Appointment date must be in the future.');
+    }
+
+    // If a requestId is provided, verify the donor has accepted it
+    if (dto.requestId) {
+      const request = await this.requestModel.findOne({
+        _id: dto.requestId,
+        matchedDonors: {
+          $elemMatch: {
+            donorId: new Types.ObjectId(userId),
+            status: 'accepted',
+          },
+        },
+      });
+      if (!request) {
+        throw new BadRequestException(
+          'Request not found or you have not accepted it. Use GET /donor/accepted-requests.',
+        );
+      }
+    }
+
+    // Prevent duplicate active appointments at the same hospital on the same day
+    const dayStart = new Date(scheduledAt);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(scheduledAt);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const existing = await this.appointmentModel.findOne({
+      donorId: userId,
+      hospitalId: dto.hospitalId,
+      scheduledAt: { $gte: dayStart, $lte: dayEnd },
+      status: { $nin: ['cancelled'] },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'You already have an appointment at this hospital on that day.',
+      );
+    }
+
+    const appointment = await this.appointmentModel.create({
+      donorId: userId,
+      hospitalId: new Types.ObjectId(dto.hospitalId),
+      bloodType: dto.bloodType,
+      scheduledAt,
+      donationType: dto.donationType || DonationType.WHOLE_BLOOD,
+      status: AppointmentStatus.SCHEDULED,
+      notes: dto.notes,
+    });
+
+    const populated = await this.appointmentModel
+      .findById(appointment._id)
+      .populate(
+        'hospitalId',
+        'institutionName city address phoneNumber officialEmail',
+      )
+      .lean();
+
+    this.eventEmitter.emit('appointment.scheduled', {
+      appointment: populated,
+      userId,
+    });
+
+    return {
+      message:
+        'Appointment scheduled successfully. The hospital will confirm it.',
+      data: populated,
+    };
+  }
+
+  async getMyAppointments(userId: string, query: AppointmentQueryDto) {
+    const filter: any = { donorId: userId };
+    if (query.status) filter.status = query.status;
 
     const page = query.page || 1;
     const limit = query.limit || 20;
 
-    const [hospitals, total] = await Promise.all([
-      this.hospitalModel
+    const [appointments, total] = await Promise.all([
+      this.appointmentModel
         .find(filter)
-        .select(
-          'institutionName institutionType officialEmail phoneNumber address city state country capacity',
-        )
+        .sort({ scheduledAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .sort({ institutionName: 1 })
+        .populate('hospitalId', 'institutionName city address phoneNumber')
         .lean(),
-      this.hospitalModel.countDocuments(filter),
+      this.appointmentModel.countDocuments(filter),
     ]);
 
     return {
       data: {
-        hospitals,
+        appointments,
         pagination: { total, page, limit, pages: Math.ceil(total / limit) },
       },
     };
   }
+
+  async cancelMyAppointment(
+    userId: string,
+    appointmentId: string,
+    dto: CancelAppointmentDto,
+  ) {
+    const appointment = await this.appointmentModel.findOne({
+      _id: appointmentId,
+      donorId: userId,
+    });
+
+    if (!appointment) throw new NotFoundException('Appointment not found');
+
+    if (
+      [AppointmentStatus.CANCELLED, AppointmentStatus.COMPLETED].includes(
+        appointment.status,
+      )
+    ) {
+      throw new BadRequestException(
+        `Cannot cancel an appointment that is already ${appointment.status}.`,
+      );
+    }
+
+    appointment.status = AppointmentStatus.CANCELLED;
+    appointment.cancelReason = dto.reason || 'Cancelled by donor';
+    await appointment.save();
+
+    this.eventEmitter.emit('appointment.cancelledByDonor', { appointment });
+
+    return { message: 'Appointment cancelled successfully', data: appointment };
+  }
+
+  // ─── Hospitals list (for donation logging) ────────────────────────────────────
+
+  // async getHospitals(query: HospitalListQueryDto) {
+  //   const filter: any = { status: HospitalStatus.APPROVED };
+
+  //   if (query.city) filter.city = new RegExp(query.city, 'i');
+  //   if (query.search) {
+  //     filter.$or = [
+  //       { institutionName: new RegExp(query.search, 'i') },
+  //       { city: new RegExp(query.search, 'i') },
+  //     ];
+  //   }
+
+  //   const page = query.page || 1;
+  //   const limit = query.limit || 20;
+
+  //   const [hospitals, total] = await Promise.all([
+  //     this.hospitalModel
+  //       .find(filter)
+  //       .select(
+  //         'institutionName institutionType officialEmail phoneNumber address city state country capacity',
+  //       )
+  //       .skip((page - 1) * limit)
+  //       .limit(limit)
+  //       .sort({ institutionName: 1 })
+  //       .lean(),
+  //     this.hospitalModel.countDocuments(filter),
+  //   ]);
+
+  //   return {
+  //     data: {
+  //       hospitals,
+  //       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+  //     },
+  //   };
+  // }
 
   // ─── Handle Requests ─────────────────────────────────
 
@@ -339,7 +490,7 @@ export class DonorService {
     this.eventEmitter.emit('request.created', { request });
 
     if (!request) throw new BadRequestException('Failed o create request');
-    
+
     return {
       message: 'Blood request submitted to the hospital.',
       data: this.sanitizeForDonor(request.toObject()),

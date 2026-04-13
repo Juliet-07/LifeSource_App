@@ -61,40 +61,40 @@ export class RecipientService {
 
   // ─── Hospitals list (for request placement) ───────────────────────────────────
 
-  async getHospitals(query: HospitalListQueryDto) {
-    const filter: any = { status: HospitalStatus.APPROVED };
+  // async getHospitals(query: HospitalListQueryDto) {
+  //   const filter: any = { status: HospitalStatus.APPROVED };
 
-    if (query.city) filter.city = new RegExp(query.city, 'i');
-    if (query.search) {
-      filter.$or = [
-        { institutionName: new RegExp(query.search, 'i') },
-        { city: new RegExp(query.search, 'i') },
-      ];
-    }
+  //   if (query.city) filter.city = new RegExp(query.city, 'i');
+  //   if (query.search) {
+  //     filter.$or = [
+  //       { institutionName: new RegExp(query.search, 'i') },
+  //       { city: new RegExp(query.search, 'i') },
+  //     ];
+  //   }
 
-    const page = query.page || 1;
-    const limit = query.limit || 20;
+  //   const page = query.page || 1;
+  //   const limit = query.limit || 20;
 
-    const [hospitals, total] = await Promise.all([
-      this.hospitalModel
-        .find(filter)
-        .select(
-          'institutionName institutionType officialEmail phoneNumber address city state country capacity',
-        )
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .sort({ institutionName: 1 })
-        .lean(),
-      this.hospitalModel.countDocuments(filter),
-    ]);
+  //   const [hospitals, total] = await Promise.all([
+  //     this.hospitalModel
+  //       .find(filter)
+  //       .select(
+  //         'institutionName institutionType officialEmail phoneNumber address city state country capacity',
+  //       )
+  //       .skip((page - 1) * limit)
+  //       .limit(limit)
+  //       .sort({ institutionName: 1 })
+  //       .lean(),
+  //     this.hospitalModel.countDocuments(filter),
+  //   ]);
 
-    return {
-      data: {
-        hospitals,
-        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
-      },
-    };
-  }
+  //   return {
+  //     data: {
+  //       hospitals,
+  //       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+  //     },
+  //   };
+  // }
 
   // ─── Blood Requests ───────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ export class RecipientService {
     });
     if (!hospital) {
       throw new BadRequestException(
-        'Hospital not found or not approved. Use GET /recipient/hospitals to select a valid hospital.',
+        'Hospital not found or not approved. Use GET /hospitals to select a valid hospital.',
       );
     }
 
@@ -137,7 +137,7 @@ export class RecipientService {
   }
 
   async getMyRequests(userId: string, query: RequestQueryDto) {
-    const filter: any = { recipientId: userId };
+    const filter: any = { requestorId: userId, requestSource: 'recipient' };
     if (query.status) filter.status = query.status;
     if (query.bloodType) filter.bloodType = query.bloodType;
     if (query.urgency) filter.urgency = query.urgency;

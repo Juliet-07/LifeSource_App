@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Settings, Building2, MapPin, Phone, Mail, Globe, Shield, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { mockHospitalInfo, HospitalInfo } from '@/lib/mockData';
+import { mockHospitalInfo, HospitalInfo } from '@/lib/data';
 
 const availableServices = [
   'Blood Transfusion',

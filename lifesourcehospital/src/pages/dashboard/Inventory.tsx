@@ -6,73 +6,129 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Droplets, Plus, Search, Edit, Trash2 } from 'lucide-react';
+import { Droplets, Plus, Search, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { mockBloodInventory, BloodUnit, bloodTypes } from '@/lib/mockData';
+import axios from 'axios';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+const donationTypes = [
+  { value: "whole_blood", label: "Whole Blood" },
+  { value: "plasma", label: "Plasma" },
+  { value: "platelet", label: "Platelets" },
+  { value: "double_red_cells", label: "Red Cells" },
+];
+
+interface BloodUnit {
+  _id: string;
+  bloodType: string;
+  donationType: string;
+  units: number;
+  donorId: string;
+  collectionDate: string;
+  expiryDate: string;
+  storageLocation: string;
+  status: 'available' | 'reserved' | 'used' | 'expired' | 'discarded';
+}
 
 export default function Inventory() {
-  const [inventory, setInventory] = useState<BloodUnit[]>(mockBloodInventory);
+  const apiURL = import.meta.env.VITE_REACT_APP_BASE_URL;
+  const token = localStorage.getItem("hospitalToken");
+  const queryClient = useQueryClient();
+
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [addingUnit, setAddingUnit] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [addDialog, setAddDialog] = useState(false);
-  const [editDialog, setEditDialog] = useState<{ open: boolean; unit: BloodUnit | null }>({ open: false, unit: null });
 
-  // Form state for new unit
-  const [newUnit, setNewUnit] = useState({
+  const initialValues = {
     bloodType: '',
-    quantity: 1,
-    donorName: '',
-    storageLocation: '',
+    donationType: '',
+    units: 0,
     collectionDate: '',
+    batchNumber: '',
+    storageLocation: '',
+    donorName: '',
+    notes: ''
+  }
+  const [newUnit, setNewUnit] = useState(initialValues);
+
+  // ── GET inventory ──────────────────────────────────────────────────────────
+  const { data: inventory = [], isLoading, isError } = useQuery<BloodUnit[]>({
+    queryKey: ["inventory"],
+    queryFn: async () => {
+      const res = await axios.get(`${apiURL}/hospital/inventory`, { headers });
+      console.log(res.data.data.inventory)
+      return res.data.data.inventory;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
-  const filteredInventory = inventory.filter(unit => {
-    const matchesSearch = unit.donorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          unit.storageLocation.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === 'all' || unit.bloodType === typeFilter;
-    const matchesStatus = statusFilter === 'all' || unit.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
-  });
-
-  const handleAddUnit = () => {
-    if (!newUnit.bloodType || !newUnit.donorName || !newUnit.collectionDate) {
+  // ── POST add unit ──────────────────────────────────────────────────────────
+  const handleAddUnit = async () => {
+    if (!newUnit.bloodType || !newUnit.donationType || !newUnit.donorName || !newUnit.collectionDate) {
       toast.error('Please fill all required fields');
       return;
     }
 
     const expiryDate = new Date(newUnit.collectionDate);
-    expiryDate.setDate(expiryDate.getDate() + 42); // Blood expires in 42 days
+    expiryDate.setDate(expiryDate.getDate() + 42);
 
-    const unit: BloodUnit = {
-      id: Date.now().toString(),
+    const payload = {
       bloodType: newUnit.bloodType,
-      quantity: newUnit.quantity,
-      donorId: Date.now().toString(),
+      units: newUnit.units,
       donorName: newUnit.donorName,
+      donationType: newUnit.donationType,
       collectionDate: newUnit.collectionDate,
       expiryDate: expiryDate.toISOString().split('T')[0],
+      batchNumber: newUnit.batchNumber,
       storageLocation: newUnit.storageLocation,
-      status: 'available',
+      notes: newUnit.notes
     };
 
-    setInventory(prev => [...prev, unit]);
-    toast.success('Blood unit added to inventory');
-    setAddDialog(false);
-    setNewUnit({ bloodType: '', quantity: 1, donorName: '', storageLocation: '', collectionDate: '' });
+    setAddingUnit(true);
+    try {
+      await axios.post(`${apiURL}/hospital/inventory`, payload, { headers });
+      toast.success('Blood unit added to inventory');
+      setAddDialog(false);
+      setNewUnit(initialValues);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    } catch (error) {
+      toast.error('Failed to add blood unit');
+      console.error(error);
+    } finally {
+      setAddingUnit(false);
+    }
   };
 
-  const updateUnitStatus = (id: string, status: BloodUnit['status']) => {
-    setInventory(prev => prev.map(unit => 
-      unit.id === id ? { ...unit, status } : unit
-    ));
-    toast.success(`Unit marked as ${status}`);
+  // ── PATCH update status ────────────────────────────────────────────────────
+  const updateUnitStatus = async (id: string, status: BloodUnit['status']) => {
+    setActionLoadingId(id);
+    try {
+      await axios.patch(`${apiURL}/hospital/inventory/${id}`, { status }, { headers });
+      toast.success(`Unit marked as ${status}`);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    } catch (error) {
+      toast.error('Failed to update unit status');
+      console.error(error);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
-  const deleteUnit = (id: string) => {
-    setInventory(prev => prev.filter(unit => unit.id !== id));
-    toast.success('Unit removed from inventory');
-  };
+  // ── Filtering ──────────────────────────────────────────────────────────────
+  const filteredInventory = inventory.filter(unit => {
+    const matchesSearch =
+      unit.donorId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      unit.storageLocation?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === 'all' || unit.bloodType === typeFilter;
+    const matchesStatus = statusFilter === 'all' || unit.status === statusFilter;
+    return matchesSearch && matchesType && matchesStatus;
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -86,12 +142,12 @@ export default function Inventory() {
   };
 
   const inventoryStats = {
-    total: inventory.filter(u => u.status === 'available').reduce((acc, u) => acc + u.quantity, 0),
-    reserved: inventory.filter(u => u.status === 'reserved').reduce((acc, u) => acc + u.quantity, 0),
+    total: inventory.filter(u => u.status === 'available').reduce((acc, u) => acc + u.units, 0),
+    reserved: inventory.filter(u => u.status === 'reserved').reduce((acc, u) => acc + u.units, 0),
     expiringSoon: inventory.filter(u => {
-      const expiry = new Date(u.expiryDate);
-      const today = new Date();
-      const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const daysUntilExpiry = Math.ceil(
+        (new Date(u.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      );
       return u.status === 'available' && daysUntilExpiry <= 7 && daysUntilExpiry > 0;
     }).length,
   };
@@ -103,11 +159,11 @@ export default function Inventory() {
           <h1 className="text-2xl font-bold text-foreground">Blood Inventory</h1>
           <p className="text-muted-foreground">Manage blood units and storage</p>
         </div>
+
         <Dialog open={addDialog} onOpenChange={setAddDialog}>
           <DialogTrigger asChild>
             <Button className="bg-secondary hover:bg-secondary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Blood Unit
+              <Plus className="w-4 h-4 mr-2" /> Add Blood Unit
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -118,44 +174,58 @@ export default function Inventory() {
               <div className="space-y-2">
                 <Label>Blood Type *</Label>
                 <Select value={newUnit.bloodType} onValueChange={(v) => setNewUnit(prev => ({ ...prev, bloodType: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select blood type" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select blood type" /></SelectTrigger>
                   <SelectContent>
-                    {bloodTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
+                    {bloodGroups.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Donation Type *</Label>
+                <Select value={newUnit.donationType} onValueChange={(v) => setNewUnit(prev => ({ ...prev, donationType: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select donation type" /></SelectTrigger>
+                  <SelectContent>
+                    {donationTypes.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Quantity (units)</Label>
-                <Input 
-                  type="number" 
-                  min="1"
-                  value={newUnit.quantity}
-                  onChange={(e) => setNewUnit(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                <Input
+                  type="number"
+                  value={newUnit.units}
+                  onChange={(e) => setNewUnit(prev => ({ ...prev, units: parseInt(e.target.value) }))}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Donor Name *</Label>
-                <Input 
+                <Label>Donor Name</Label>
+                <Input
                   value={newUnit.donorName}
                   onChange={(e) => setNewUnit(prev => ({ ...prev, donorName: e.target.value }))}
                   placeholder="Enter donor name"
+                  required
                 />
               </div>
               <div className="space-y-2">
                 <Label>Collection Date *</Label>
-                <Input 
+                <Input
                   type="date"
                   value={newUnit.collectionDate}
                   onChange={(e) => setNewUnit(prev => ({ ...prev, collectionDate: e.target.value }))}
                 />
               </div>
               <div className="space-y-2">
+                <Label>Batch Number</Label>
+                <Input
+                  value={newUnit.batchNumber}
+                  onChange={(e) => setNewUnit(prev => ({ ...prev, batchNumber: e.target.value }))}
+                  placeholder="Enter batch number"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>Storage Location</Label>
-                <Input 
+                <Input
                   value={newUnit.storageLocation}
                   onChange={(e) => setNewUnit(prev => ({ ...prev, storageLocation: e.target.value }))}
                   placeholder="e.g., Refrigerator A"
@@ -164,7 +234,13 @@ export default function Inventory() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setAddDialog(false)}>Cancel</Button>
-              <Button className="bg-secondary hover:bg-secondary/90" onClick={handleAddUnit}>Add Unit</Button>
+              <Button
+                className="bg-secondary hover:bg-secondary/90"
+                onClick={handleAddUnit}
+                disabled={addingUnit}
+              >
+                {addingUnit ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</> : 'Add Unit'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -172,39 +248,23 @@ export default function Inventory() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Available Units</p>
-                <p className="text-2xl font-bold text-success">{inventoryStats.total}</p>
+        {[
+          { label: 'Available Units', value: inventoryStats.total, color: 'text-success' },
+          { label: 'Reserved Units', value: inventoryStats.reserved, color: 'text-warning' },
+          { label: 'Expiring Soon', value: inventoryStats.expiringSoon, color: 'text-destructive' },
+        ].map(({ label, value, color }) => (
+          <Card key={label} className="border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{label}</p>
+                  <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                </div>
+                <Droplets className={`w-8 h-8 ${color}`} />
               </div>
-              <Droplets className="w-8 h-8 text-success" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Reserved Units</p>
-                <p className="text-2xl font-bold text-warning">{inventoryStats.reserved}</p>
-              </div>
-              <Droplets className="w-8 h-8 text-warning" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                <p className="text-2xl font-bold text-destructive">{inventoryStats.expiringSoon}</p>
-              </div>
-              <Droplets className="w-8 h-8 text-destructive" />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Filters */}
@@ -226,9 +286,7 @@ export default function Inventory() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {bloodTypes.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
+                {bloodGroups.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -257,59 +315,78 @@ export default function Inventory() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Blood Type</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Qty</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Donor</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Collection</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Expiry</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Location</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInventory.map((unit) => (
-                  <tr key={unit.id} className="border-b border-border last:border-0 hover:bg-muted/50">
-                    <td className="py-3 px-3">
-                      <Badge variant="outline" className="text-primary border-primary font-bold">{unit.bloodType}</Badge>
-                    </td>
-                    <td className="py-3 px-3 font-medium text-foreground">{unit.quantity}</td>
-                    <td className="py-3 px-3 text-foreground">{unit.donorName}</td>
-                    <td className="py-3 px-3 text-foreground">{unit.collectionDate}</td>
-                    <td className="py-3 px-3 text-foreground">{unit.expiryDate}</td>
-                    <td className="py-3 px-3 text-foreground">{unit.storageLocation}</td>
-                    <td className="py-3 px-3">{getStatusBadge(unit.status)}</td>
-                    <td className="py-3 px-3">
-                      <div className="flex gap-1">
-                        {unit.status === 'available' && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => updateUnitStatus(unit.id, 'used')}>
-                              Used
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => updateUnitStatus(unit.id, 'discarded')}>
-                              Discard
-                            </Button>
-                          </>
-                        )}
-                        {unit.status === 'expired' && (
-                          <Button size="sm" variant="destructive" onClick={() => deleteUnit(unit.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Loading inventory...</span>
+            </div>
+          ) : isError ? (
+            <div className="text-center py-8 text-destructive">
+              Failed to load inventory. Please try again.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    {['Blood Type', 'Donation Type', 'Qty', 'Donor', 'Collection', 'Expiry', 'Location', 'Status', 'Actions'].map(h => (
+                      <th key={h} className="text-left py-3 px-3 text-sm font-medium text-muted-foreground">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {filteredInventory.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No blood units found
+                </thead>
+                <tbody>
+                  {filteredInventory.map((unit) => (
+                    <tr key={unit._id} className="border-b border-border last:border-0 hover:bg-muted/50">
+                      <td className="py-3 px-3">
+                        <Badge variant="outline" className="text-primary border-primary font-bold">{unit.bloodType}</Badge>
+                      </td>
+                      <td className="py-3 px-3 font-medium text-foreground">{unit.donationType}</td>
+                      <td className="py-3 px-3 font-medium text-foreground">{unit.units}</td>
+                      <td className="py-3 px-3 text-foreground">{unit.donorId}</td>
+                      <td className="py-3 px-3 text-foreground">{new Date(unit.collectionDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
+                      <td className="py-3 px-3 text-foreground">{new Date(unit.expiryDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
+                      <td className="py-3 px-3 text-foreground">{unit.storageLocation}</td>
+                      <td className="py-3 px-3">{getStatusBadge(unit.status)}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex gap-1">
+                          {unit.status === 'available' && (
+                            <>
+                              <Button
+                                size="sm" variant="outline"
+                                disabled={actionLoadingId === unit._id}
+                                onClick={() => updateUnitStatus(unit._id, 'used')}
+                              >
+                                {actionLoadingId === unit._id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Used'}
+                              </Button>
+                              <Button
+                                size="sm" variant="outline"
+                                disabled={actionLoadingId === unit._id}
+                                onClick={() => updateUnitStatus(unit._id, 'discarded')}
+                              >
+                                Discard
+                              </Button>
+                            </>
+                          )}
+                          {unit.status === 'expired' && (
+                            <Button
+                              size="sm" variant="destructive"
+                              disabled={actionLoadingId === unit._id}
+                              onClick={() => updateUnitStatus(unit._id, 'discarded')}
+                            >
+                              {actionLoadingId === unit._id
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Trash2 className="w-4 h-4" />}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredInventory.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">No blood units found</div>
+              )}
             </div>
           )}
         </CardContent>

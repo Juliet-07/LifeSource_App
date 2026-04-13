@@ -22,6 +22,9 @@ import {
   HospitalListQueryDto,
   CreateDonorBloodRequestDto,
   DonorRequestQueryDto,
+  ScheduleAppointmentDto,
+  AppointmentQueryDto,
+  CancelAppointmentDto,
 } from '../../dtos';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guard';
 import { Roles, CurrentUser } from '../../../common/decorators';
@@ -54,15 +57,58 @@ export class DonorController {
     return this.donorService.updateProfile(userId, dto);
   }
 
-  @Get('hospitals')
+  // ─── Appointments ──────────────────────────────────────────────────────────────
+
+  @Post('appointments')
   @ApiOperation({
-    summary: 'List approved hospitals',
+    summary: 'Schedule a donation appointment at a hospital',
     description:
-      'Returns all approved hospitals in the system. Use the hospital _id when logging a donation.',
+      'Book an appointment to come and donate blood at a specific hospital. ' +
+      'The hospital will receive the request and confirm, reschedule, or cancel it. ' +
+      'Use GET /hospitals to find a hospital. ' +
+      'You can optionally link the appointment to an accepted blood request.',
   })
-  getHospitals(@Query() query: HospitalListQueryDto) {
-    return this.donorService.getHospitals(query);
+  scheduleAppointment(
+    @CurrentUser('_id') userId: string,
+    @Body() dto: ScheduleAppointmentDto,
+  ) {
+    return this.donorService.scheduleAppointment(userId, dto);
   }
+
+  @Get('appointments')
+  @ApiOperation({
+    summary: 'Get my donation appointments',
+    description:
+      'Returns all appointments this donor has scheduled. ' +
+      'Status flow: scheduled → confirmed (by hospital) → completed. ' +
+      'Hospital can also reschedule or cancel.',
+  })
+  getMyAppointments(
+    @CurrentUser('_id') userId: string,
+    @Query() query: AppointmentQueryDto,
+  ) {
+    return this.donorService.getMyAppointments(userId, query);
+  }
+
+  @Patch('appointments/:id/cancel')
+  @ApiOperation({ summary: 'Cancel a scheduled appointment' })
+  cancelAppointment(
+    @CurrentUser('_id') userId: string,
+    @Param('id') appointmentId: string,
+    @Body() dto: CancelAppointmentDto,
+  ) {
+    return this.donorService.cancelMyAppointment(userId, appointmentId, dto);
+  }
+
+  // @Get('hospitals')
+  // @ApiOperation({
+  //   summary: 'List approved hospitals',
+  //   description:
+  //     'Returns all approved hospitals in the system. Use the hospital _id when logging a donation.',
+  // })
+  // getHospitals(@Query() query: HospitalListQueryDto) {
+  //   return this.donorService.getHospitals(query);
+  // }
 
   @Get('accepted-requests')
   @ApiOperation({
@@ -91,50 +137,50 @@ export class DonorController {
 
   // ─── Donor-initiated blood requests (to hospitals) ────────────────────────────
 
-  @Post('requests')
-  @ApiOperation({
-    summary: 'Submit a blood request to a hospital (as a donor needing blood)',
-    description:
-      'Donors can also request blood for themselves. This is completely separate from recipient requests — ' +
-      'no recipient data is ever mixed in or visible here. Use GET /donor/hospitals to find a hospital.',
-  })
-  createBloodRequest(
-    @CurrentUser('_id') userId: string,
-    @Body() dto: CreateDonorBloodRequestDto,
-  ) {
-    return this.donorService.createBloodRequest(userId, dto);
-  }
+  // @Post('requests')
+  // @ApiOperation({
+  //   summary: 'Submit a blood request to a hospital (as a donor needing blood)',
+  //   description:
+  //     'Donors can also request blood for themselves. This is completely separate from recipient requests — ' +
+  //     'no recipient data is ever mixed in or visible here. Use GET /donor/hospitals to find a hospital.',
+  // })
+  // createBloodRequest(
+  //   @CurrentUser('_id') userId: string,
+  //   @Body() dto: CreateDonorBloodRequestDto,
+  // ) {
+  //   return this.donorService.createBloodRequest(userId, dto);
+  // }
 
-  @Get('requests')
-  @ApiOperation({
-    summary: 'My blood requests (donor-initiated)',
-    description:
-      'Lists blood requests this donor submitted to hospitals. Completely isolated from recipient data.',
-  })
-  getMyBloodRequests(
-    @CurrentUser('_id') userId: string,
-    @Query() query: DonorRequestQueryDto,
-  ) {
-    return this.donorService.getMyBloodRequests(userId, query);
-  }
+  // @Get('requests')
+  // @ApiOperation({
+  //   summary: 'My blood requests (donor-initiated)',
+  //   description:
+  //     'Lists blood requests this donor submitted to hospitals. Completely isolated from recipient data.',
+  // })
+  // getMyBloodRequests(
+  //   @CurrentUser('_id') userId: string,
+  //   @Query() query: DonorRequestQueryDto,
+  // ) {
+  //   return this.donorService.getMyBloodRequests(userId, query);
+  // }
 
-  @Get('requests/:id/status')
-  @ApiOperation({ summary: 'Track status of a donor-submitted blood request' })
-  getBloodRequestStatus(
-    @CurrentUser('_id') userId: string,
-    @Param('id') requestId: string,
-  ) {
-    return this.donorService.getBloodRequestStatus(userId, requestId);
-  }
+  // @Get('requests/:id/status')
+  // @ApiOperation({ summary: 'Track status of a donor-submitted blood request' })
+  // getBloodRequestStatus(
+  //   @CurrentUser('_id') userId: string,
+  //   @Param('id') requestId: string,
+  // ) {
+  //   return this.donorService.getBloodRequestStatus(userId, requestId);
+  // }
 
-  @Patch('requests/:id/cancel')
-  @ApiOperation({ summary: 'Cancel a donor-submitted blood request' })
-  cancelBloodRequest(
-    @CurrentUser('_id') userId: string,
-    @Param('id') requestId: string,
-  ) {
-    return this.donorService.cancelBloodRequest(userId, requestId);
-  }
+  // @Patch('requests/:id/cancel')
+  // @ApiOperation({ summary: 'Cancel a donor-submitted blood request' })
+  // cancelBloodRequest(
+  //   @CurrentUser('_id') userId: string,
+  //   @Param('id') requestId: string,
+  // ) {
+  //   return this.donorService.cancelBloodRequest(userId, requestId);
+  // }
 
   @Get('notifications')
   @ApiOperation({ summary: 'Get donor notifications' })

@@ -51,7 +51,7 @@ export default function Signin() {
 
         try {
             const response = await axios.post(url, loginDetails);
-            console.log(response.data.data, "response");
+            // console.log(response.data.data, "response");
 
             const accessToken = response.data.data.accessToken;
             localStorage.setItem("hospitalToken", accessToken);

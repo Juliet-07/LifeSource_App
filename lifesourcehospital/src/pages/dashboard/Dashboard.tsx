@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
+    localStorage.removeItem("hospitalToken");
     toast.success('Successfully signed out!');
     navigate('/');
   };

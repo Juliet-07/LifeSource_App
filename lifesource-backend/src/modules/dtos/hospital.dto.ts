@@ -18,6 +18,7 @@ import {
   UrgencyLevel,
   RequestStatus,
 } from '../../common/enums';
+import { Type } from 'class-transformer';
 
 export class CreateHospitalProfileDto {
   @ApiProperty()
@@ -121,8 +122,7 @@ export class AddInventoryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsMongoId()
-  donorId?: string;
+  donorName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -250,4 +250,30 @@ export class UpdateRequestStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+export class PublicHospitalQueryDto {
+  @ApiPropertyOptional({
+    description: 'Search by hospital name, city, or state',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ example: 'Lagos' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number;
 }

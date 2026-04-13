@@ -15,6 +15,7 @@ export default function Overview() {
 
   const getDashboardData = async () => {
     const res = await axios.get(`${apiURL}/hospital/dashboard`, { headers: authHeaders });
+    console.log(res.data.data)
     return res.data.data;
   };
 
@@ -47,43 +48,6 @@ export default function Overview() {
   }
 
   const { hospital, inventory, requests, appointments, donations } = data;
-
-  const stats = [
-    {
-      label: 'Available Blood Units',
-      value: inventory?.totalAvailableUnits ?? 0,
-      icon: Droplets,
-      color: 'text-primary',
-      sub: `${inventory?.expiringInSevenDays ?? 0} expiring in 7 days`,
-      subColor: inventory?.expiringInSevenDays > 0 ? 'text-destructive' : 'text-muted-foreground',
-    },
-    {
-      label: 'Awaiting Confirmation',
-      value: appointments?.awaitingConfirmation ?? 0,
-      icon: Calendar,
-      color: 'text-secondary',
-      sub: `${appointments?.today ?? 0} today · ${appointments?.upcomingThisWeek ?? 0} this week`,
-      subColor: 'text-muted-foreground',
-    },
-    {
-      label: 'Urgent Open Requests',
-      value: requests?.urgentOpen ?? 0,
-      icon: AlertTriangle,
-      color: 'text-destructive',
-      sub: `${requests?.pending ?? 0} total pending`,
-      subColor: 'text-muted-foreground',
-    },
-    {
-      label: 'Donations This Month',
-      value: donations?.processedThisMonth ?? 0,
-      icon: TrendingUp,
-      color: 'text-secondary',
-      sub: `${requests?.fulfillmentRate ?? 0}% fulfillment rate`,
-      subColor: 'text-muted-foreground',
-    },
-  ];
-
-  const bloodTypeOrder = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
 
   // Normalize byBloodType array into a lookup map
   const inventoryByType: Record<string, number> = {};
@@ -126,18 +90,47 @@ export default function Overview() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="border-border">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-              </div>
-              <p className="text-3xl font-bold text-foreground">{stat.value}</p>
-              <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
-              <p className={`text-xs mt-1 ${stat.subColor}`}>{stat.sub}</p>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <Droplets className='w-8 h-8 text-primary' />
+            </div>
+            <p className="text-3xl font-bold text-foreground">{inventory?.totalAvailableUnits}</p>
+            <p className="text-sm text-muted-foreground mt-1">Available Blood Units</p>
+            <p className="text-xs text-muted-foreground mt-1">{inventory?.expiringInSevenDays} expiring in seven days</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <Calendar className='w-8 h-8 text-secondary' />
+            </div>
+            <p className="text-3xl font-bold text-foreground">{appointments?.awaitingConfirmation}</p>
+            <p className="text-sm text-muted-foreground mt-1">Awaiting Confirmation</p>
+            <p className="text-xs text-muted-foreground mt-1">{appointments?.today} today . {data?.appointments?.upcomingThisWeek} this week</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <AlertTriangle className='w-8 h-8 text-destructive' />
+            </div>
+            <p className="text-3xl font-bold text-foreground">{requests?.urgentOpen}</p>
+            <p className="text-sm text-muted-foreground mt-1">Urgent Open Requests</p>
+            <p className="text-xs text-muted-foreground mt-1">{requests?.pending} total pending</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-3">
+              <TrendingUp className='w-8 h-8 text-secondary' />
+            </div>
+            <p className="text-3xl font-bold text-foreground">{donations?.processedThisMonth}</p>
+            <p className="text-sm text-muted-foreground mt-1">Donations This Month</p>
+            <p className="text-xs text-muted-foreground mt-1">{donations?.processedThisMonth}% fulfillment rate</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Blood Inventory by Type */}
@@ -149,21 +142,21 @@ export default function Overview() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {inventory?.byBloodType?.length === 0 ? (
+          {data?.inventory?.byBloodType?.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground text-sm">
               No inventory data available
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-              {bloodTypeOrder.map((type) => {
-                const units = inventoryByType[type] ?? 0;
+              {data?.inventory?.byBloodType.map((type) => {
+                // const units = inventoryByType[type] ?? 0;
                 return (
                   <div
                     key={type}
-                    className={`rounded-lg p-3 text-center border ${units === 0 ? 'border-border bg-muted/40' : 'border-primary/20 bg-primary/5'}`}
+                    className={`rounded-lg p-3 text-center border ${type?.units === 0 ? 'border-border bg-muted/40' : 'border-primary/20 bg-primary/5'}`}
                   >
-                    <p className="text-lg font-bold text-primary">{type}</p>
-                    <p className="text-2xl font-bold text-foreground">{units}</p>
+                    <p className="text-lg font-bold text-primary">{type?._id}</p>
+                    <p className="text-2xl font-bold text-foreground">{type?.units}</p>
                     <p className="text-xs text-muted-foreground">units</p>
                   </div>
                 );

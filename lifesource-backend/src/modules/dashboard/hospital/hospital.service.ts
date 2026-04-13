@@ -30,6 +30,7 @@ import {
   HospitalRequestQueryDto,
   MatchInventoryDto,
   UpdateRequestStatusDto,
+  PublicHospitalQueryDto,
 } from '../../dtos';
 import {
   InventoryStatus,
@@ -285,6 +286,58 @@ export class HospitalService {
     return hospital;
   }
 
+  async getApprovedHospitals(query: PublicHospitalQueryDto) {
+    /**
+     * Query by the string value directly instead of the enum constant.
+     * This makes the filter robust against case differences or enum import issues
+     * in existing DB documents (e.g. documents approved before the enum was standardised).
+     */
+    const filter: any = {
+      status: { $in: ['approved', 'APPROVED'] }, // catch both casings defensively
+    };
+
+    if (query.city) {
+      filter.city = { $regex: query.city, $options: 'i' };
+    }
+
+    if (query.search) {
+      filter.$or = [
+        { institutionName: { $regex: query.search, $options: 'i' } },
+        { city: { $regex: query.search, $options: 'i' } },
+        { state: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(100, query.limit || 20);
+
+    const [hospitals, total] = await Promise.all([
+      this.hospitalModel
+        .find(filter)
+        .select(
+          'institutionName institutionType officialEmail phoneNumber ' +
+            'address city state country zipCode capacity status',
+        )
+        .sort({ institutionName: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      this.hospitalModel.countDocuments(filter),
+    ]);
+
+    return {
+      data: {
+        hospitals,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    };
+  }
+
   // ─── Blood Inventory ──────────────────────────────────────────────────────────
   async addInventory(userId: string, dto: AddInventoryDto) {
     const hospital = await this.getHospitalByAdmin(userId);
@@ -298,7 +351,7 @@ export class HospitalService {
       expiryDate: new Date(dto.expiryDate),
       batchNumber: dto.batchNumber,
       storageLocation: dto.storageLocation,
-      donorId: dto.donorId,
+      donorId: dto.donorName,
       notes: dto.notes,
       addedBy: userId,
     });
@@ -378,7 +431,7 @@ export class HospitalService {
         .skip((page - 1) * limit)
         .limit(limit)
         .sort({ scheduledAt: 1 })
-        .populate('donorId', 'name email phone')
+        .populate('donorId', 'firstName lastName email phone')
         .lean(),
       this.appointmentModel.countDocuments(filter),
     ]);
@@ -445,6 +498,139 @@ export class HospitalService {
     return { message: 'Appointment cancelled', data: appointment };
   }
 
+  async getConfirmedAppointments(userId: string, query: AppointmentQueryDto) {
+    const hospital = await this.getHospitalByAdmin(userId);
+
+    // "Confirmed appointments" = any appointment that has been confirmed or completed
+    // (not pending-scheduled, not cancelled)
+    const filter: any = {
+      hospitalId: hospital._id,
+      status: {
+        $in: [AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED],
+      },
+    };
+
+    if (query.date) {
+      const day = new Date(query.date);
+      const nextDay = addDays(day, 1);
+      filter.scheduledAt = { $gte: day, $lt: nextDay };
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
+    const [appointments, total] = await Promise.all([
+      this.appointmentModel
+        .find(filter)
+        .sort({ scheduledAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('donorId', 'name email phone bloodType')
+        .lean(),
+      this.appointmentModel.countDocuments(filter),
+    ]);
+
+    // Summary counts
+    const [confirmedCount, completedCount] = await Promise.all([
+      this.appointmentModel.countDocuments({
+        hospitalId: hospital._id,
+        status: AppointmentStatus.CONFIRMED,
+      }),
+      this.appointmentModel.countDocuments({
+        hospitalId: hospital._id,
+        status: AppointmentStatus.COMPLETED,
+      }),
+    ]);
+
+    return {
+      data: {
+        appointments,
+        summary: {
+          confirmed: confirmedCount,
+          completed: completedCount,
+          total: confirmedCount + completedCount,
+        },
+        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+      },
+    };
+  }
+
+  // ─── Accepted / Handled Blood Requests History ────────────────────────────────
+
+  async getHandledRequests(userId: string, query: HospitalRequestQueryDto) {
+    const hospital = await this.getHospitalByAdmin(userId);
+
+    // "Handled" = requests this hospital has taken action on:
+    // confirmed_by_hospital, fulfilled, or partially_fulfilled.
+    // Excludes still-pending and unavailable.
+    const filter: any = {
+      hospitalId: hospital._id,
+      status: {
+        $in: [
+          RequestStatus.CONFIRMED_BY_HOSPITAL,
+          RequestStatus.FULFILLED,
+          RequestStatus.PARTIALLY_FULFILLED,
+        ],
+      },
+    };
+
+    if (query.urgency) filter.urgency = query.urgency;
+    if (query.bloodType) filter.bloodType = query.bloodType;
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+
+    const [requests, total] = await Promise.all([
+      this.requestModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        // requestorId is the user who made the request (donor or recipient context)
+        .populate('requestorId', 'name email bloodType')
+        .lean(),
+      this.requestModel.countDocuments(filter),
+    ]);
+
+    // Annotate each with the request type for clarity
+    const labeled = requests.map((r: any) => ({
+      ...r,
+      requestType:
+        r.requestSource === 'donor'
+          ? 'Donor Request (donor came to donate)'
+          : 'Recipient Request (patient needs blood)',
+    }));
+
+    // Summary by status
+    const [confirmedCount, fulfilledCount, partialCount] = await Promise.all([
+      this.requestModel.countDocuments({
+        hospitalId: hospital._id,
+        status: RequestStatus.CONFIRMED_BY_HOSPITAL,
+      }),
+      this.requestModel.countDocuments({
+        hospitalId: hospital._id,
+        status: RequestStatus.FULFILLED,
+      }),
+      this.requestModel.countDocuments({
+        hospitalId: hospital._id,
+        status: RequestStatus.PARTIALLY_FULFILLED,
+      }),
+    ]);
+
+    return {
+      data: {
+        requests: labeled,
+        summary: {
+          confirmedByHospital: confirmedCount,
+          fulfilled: fulfilledCount,
+          partiallyFulfilled: partialCount,
+          total: confirmedCount + fulfilledCount + partialCount,
+        },
+        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+      },
+    };
+  }
+
   // ─── Request Management ──────────────────────────────────────────────────────
 
   async getRequests(userId: string, query: HospitalRequestQueryDto) {
@@ -464,7 +650,7 @@ export class HospitalService {
         .skip((page - 1) * limit)
         .limit(limit)
         .sort({ urgency: 1, createdAt: -1 })
-        .populate('recipientId', 'name email phone')
+        .populate('requestorId', 'firstName lastName email phone')
         .lean(),
       this.requestModel.countDocuments(filter),
     ]);
@@ -535,17 +721,24 @@ export class HospitalService {
     request.status = dto.status;
     if (dto.unitsFulfilled !== undefined)
       request.unitsFulfilled = dto.unitsFulfilled;
+
     if (dto.status === RequestStatus.FULFILLED) {
       request.fulfilledAt = new Date();
+
       // Mark reserved inventory as used
       await this.inventoryModel.updateMany(
         { usedForRequest: requestId, status: InventoryStatus.RESERVED },
         { status: InventoryStatus.USED, usedAt: new Date() },
       );
+
       // FIX 2: Hospital.findByIdAndUpdate -> this.hospitalModel.findByIdAndUpdate
       await this.hospitalModel.findByIdAndUpdate(hospital._id, {
         $inc: { totalRequestsFulfilled: 1 },
       });
+    }
+
+    if (dto.status === RequestStatus.UNAVAILABLE) {
+      this.eventEmitter.emit('request.needsDonor', { request });
     }
 
     await request.save();

@@ -210,3 +210,75 @@ export class DonorRequestQueryDto {
   @IsNumber()
   limit?: number;
 }
+
+// ─── Appointment Scheduling ───────────────────────────────────────────────────
+
+export class ScheduleAppointmentDto {
+  @ApiProperty({
+    description:
+      'ID of the approved hospital to schedule at. Use GET /hospitals to find one.',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @IsMongoId()
+  hospitalId: string;
+
+  @ApiProperty({
+    description: 'Preferred date and time for the appointment (ISO 8601)',
+    example: '2026-04-15T09:00:00.000Z',
+  })
+  @IsDateString()
+  scheduledAt: string;
+
+  @ApiPropertyOptional({
+    enum: DonationType,
+    default: DonationType.WHOLE_BLOOD,
+    description: 'Type of donation. Defaults to whole blood.',
+  })
+  @IsOptional()
+  @IsEnum(DonationType)
+  donationType?: DonationType;
+
+  @ApiProperty({ enum: BloodType, example: BloodType.O_POSITIVE })
+  @IsEnum(BloodType)
+  bloodType: BloodType;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional ID of an accepted blood request this appointment is linked to.',
+  })
+  @IsOptional()
+  @IsMongoId()
+  requestId?: string;
+
+  @ApiPropertyOptional({ description: 'Any notes for the hospital' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CancelAppointmentDto {
+  @ApiPropertyOptional({ description: 'Reason for cancellation' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+// export class AppointmentQueryDto {
+//   @ApiPropertyOptional({
+//     description: 'Filter by status',
+//     enum: ['scheduled', 'confirmed', 'rescheduled', 'cancelled', 'completed'],
+//   })
+//   @IsOptional()
+//   @IsString()
+//   status?: string;
+
+//   @ApiPropertyOptional({ default: 1 })
+//   @IsOptional()
+//   @IsNumber()
+//   page?: number;
+
+//   @ApiPropertyOptional({ default: 20 })
+//   @IsOptional()
+//   @IsNumber()
+//   limit?: number;
+// }

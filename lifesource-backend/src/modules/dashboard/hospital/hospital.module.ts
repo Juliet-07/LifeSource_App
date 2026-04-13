@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { HospitalController } from './hospital.controller';
+import { HospitalController, PublicHospitalsController } from './hospital.controller';
 import { HospitalService } from './hospital.service';
 import {
   Appointment,
@@ -25,7 +25,7 @@ import {
       { name: Notification.name, schema: NotificationSchema },
     ]),
   ],
-  controllers: [HospitalController],
+  controllers: [HospitalController, PublicHospitalsController],
   providers: [HospitalService],
   exports: [HospitalService, MongooseModule],
 })

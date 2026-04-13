@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Droplets, Calendar, Users, TrendingUp, TrendingDown } from 'lucide-react';
-import { mockBloodInventory, mockAppointments, mockRecipientRequests, mockDonors, mockRecipients } from '@/lib/mockData';
+import { mockBloodInventory, mockAppointments, mockRecipientRequests, mockDonors, mockRecipients } from '@/lib/data';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 export default function Reports() {

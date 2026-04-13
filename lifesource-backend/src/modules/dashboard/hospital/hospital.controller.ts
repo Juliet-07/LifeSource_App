@@ -25,6 +25,7 @@ import {
   HospitalRequestQueryDto,
   MatchInventoryDto,
   UpdateRequestStatusDto,
+  PublicHospitalQueryDto,
 } from '../../dtos';
 import { JwtAuthGuard, RolesGuard } from '../../auth/guard';
 import { Roles, CurrentUser } from '../../../common/decorators';
@@ -148,6 +149,37 @@ export class HospitalController {
     return this.hospitalService.cancelAppointment(userId, appointmentId);
   }
 
+  @Get('appointments/confirmed')
+  @ApiOperation({
+    summary: 'Confirmed & completed appointments history',
+    description:
+      'Returns all appointments this hospital has confirmed or completed. ' +
+      'Filter by date (YYYY-MM-DD) to see a specific day. ' +
+      'Includes donor details and a summary count.',
+  })
+  getConfirmedAppointments(
+    @CurrentUser('_id') userId: string,
+    @Query() query: AppointmentQueryDto,
+  ) {
+    return this.hospitalService.getConfirmedAppointments(userId, query);
+  }
+
+  @Get('requests/handled')
+  @ApiOperation({
+    summary: 'Handled blood requests history',
+    description:
+      'Returns all blood requests this hospital has taken action on ' +
+      '(confirmed, fulfilled, or partially fulfilled). ' +
+      'Each request includes a requestType indicator (donor vs recipient). ' +
+      'Excludes still-pending and unavailable requests.',
+  })
+  getHandledRequests(
+    @CurrentUser('_id') userId: string,
+    @Query() query: HospitalRequestQueryDto,
+  ) {
+    return this.hospitalService.getHandledRequests(userId, query);
+  }
+
   // ─── Request Management ───────────────────────────────────────────────────────
 
   @Get('requests')
@@ -188,5 +220,27 @@ export class HospitalController {
     @Body() dto: UpdateRequestStatusDto,
   ) {
     return this.hospitalService.updateRequestStatus(userId, requestId, dto);
+  }
+}
+
+@ApiTags('Hospitals')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.USER) // any regular user (donor OR recipient context)
+@Controller('hospitals')
+export class PublicHospitalsController {
+  constructor(private readonly hospitalService: HospitalService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'List all approved hospitals',
+    description:
+      'Returns all approved hospitals. Accessible to any authenticated user regardless of ' +
+      'active role (donor or recipient). ' +
+      'Use the hospital _id when logging a donation (POST /donor/donation) ' +
+      'or when submitting a blood request (POST /requests).',
+  })
+  getHospitals(@Query() query: PublicHospitalQueryDto) {
+    return this.hospitalService.getApprovedHospitals(query);
   }
 }

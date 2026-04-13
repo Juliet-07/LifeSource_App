@@ -49,15 +49,15 @@ export class RecipientController {
     return this.recipientService.updateProfile(userId, dto);
   }
 
-  @Get('hospitals')
-  @ApiOperation({
-    summary: 'List approved hospitals',
-    description:
-      'Returns all approved hospitals. Use the hospital _id as `hospitalId` when creating a blood request.',
-  })
-  getHospitals(@Query() query: HospitalListQueryDto) {
-    return this.recipientService.getHospitals(query);
-  }
+  // @Get('hospitals')
+  // @ApiOperation({
+  //   summary: 'List approved hospitals',
+  //   description:
+  //     'Returns all approved hospitals. Use the hospital _id as `hospitalId` when creating a blood request.',
+  // })
+  // getHospitals(@Query() query: HospitalListQueryDto) {
+  //   return this.recipientService.getHospitals(query);
+  // }
 
   @Get('notifications')
   @ApiOperation({ summary: 'Get recipient notifications' })
